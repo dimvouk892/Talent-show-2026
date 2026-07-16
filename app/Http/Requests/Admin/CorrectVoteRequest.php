@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class CorrectVoteRequest extends FormRequest
 {
@@ -14,7 +15,7 @@ class CorrectVoteRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'score' => ['required', 'integer', 'min:1', 'max:10'],
+            'score' => ['required', 'integer', Rule::in(config('talent-show.allowed_scores', [9, 10, 12]))],
             'reason' => ['required', 'string', 'min:5'],
         ];
     }

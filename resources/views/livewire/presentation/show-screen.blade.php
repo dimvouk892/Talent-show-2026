@@ -12,21 +12,7 @@
              }, { once: true });
          })"
          class="relative flex flex-col items-center justify-center w-full">
-    @if ($talentShow->showing_closing_video && $talentShow->closing_video_path)
-        @include('livewire.presentation.partials.fullscreen-video', [
-            'videoUrl' => $talentShow->closingVideoUrl(),
-            'wireKey' => 'closing-'.$talentShow->id.'-'.$talentShow->closing_video_path,
-            'finishMethod' => 'finishClosingVideo',
-            'label' => 'Video λήξης',
-        ])
-    @elseif ($talentShow->showing_opening_video && $talentShow->opening_video_path)
-        @include('livewire.presentation.partials.fullscreen-video', [
-            'videoUrl' => $talentShow->openingVideoUrl(),
-            'wireKey' => 'opening-'.$talentShow->id.'-'.$talentShow->opening_video_path,
-            'finishMethod' => 'finishOpeningVideo',
-            'label' => 'Video έναρξης',
-        ])
-    @elseif ($winner && $talentShow->winner_revealed)
+    @if ($winner && $talentShow->winner_revealed)
         <div class="text-center relative w-full px-2" x-data x-init="
             for (let i = 0; i < 50; i++) {
                 let el = document.createElement('div');
@@ -38,12 +24,9 @@
             }
         ">
             <h1 class="text-3xl sm:text-5xl md:text-6xl font-black text-yellow-400 mb-4 sm:mb-8">ΝΙΚΗΤΡΙΑ ΟΜΑΔΑ</h1>
-            @if ($winner['team']->photo_path)
-                <img src="{{ $winner['team']->photoUrl() }}" alt="{{ $winner['team']->name }}" class="screen-media w-32 h-32 sm:w-48 sm:h-48 mx-auto rounded-2xl object-cover mb-4 sm:mb-6">
-            @endif
             <h2 class="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 break-words">{{ $winner['team']->name }}</h2>
             <p class="text-xl sm:text-2xl md:text-3xl">Τελικό σκορ: {{ $winner['total_score'] }} / {{ $winner['maximum_score'] }}</p>
-            <p class="text-lg sm:text-xl md:text-2xl text-gray-400 mt-2">Μέσος όρος: {{ number_format($winner['average_score'], 2, ',', '') }} / 10</p>
+            <p class="text-lg sm:text-xl md:text-2xl text-gray-400 mt-2">Μέσος όρος: {{ number_format($winner['average_score'], 2, ',', '') }} / 12</p>
         </div>
     @elseif ($talentShow->show_ranking && count($ranking) > 0)
         <h1 class="text-2xl sm:text-4xl md:text-5xl font-bold mb-6 sm:mb-12 text-center">Τελική κατάταξη</h1>
@@ -56,20 +39,9 @@
                 </div>
             @endforeach
         </div>
-    @elseif ($currentTeam && $talentShow->showing_team_intro && $currentTeam->video_path)
-        @include('livewire.presentation.partials.fullscreen-video', [
-            'videoUrl' => $currentTeam->videoUrl(),
-            'wireKey' => 'team-intro-'.$currentTeam->id.'-'.$currentTeam->video_path,
-            'finishMethod' => 'finishIntro',
-            'label' => 'Intro video — '.$currentTeam->name,
-        ])
     @elseif ($currentTeam)
         <div class="text-center w-full px-2">
             <p class="text-lg sm:text-2xl md:text-3xl text-gray-400 mb-3 sm:mb-4">Τρέχουσα ομάδα</p>
-            @if ($currentTeam->photo_path)
-                <img src="{{ $currentTeam->photoUrl() }}" alt="{{ $currentTeam->name }}"
-                     class="screen-media w-40 h-40 sm:w-56 sm:h-56 md:w-64 md:h-64 mx-auto rounded-2xl sm:rounded-3xl object-cover mb-4 sm:mb-8 shadow-2xl">
-            @endif
             <h1 class="text-3xl sm:text-5xl md:text-7xl font-black mb-4 sm:mb-8 break-words leading-tight">{{ $currentTeam->name }}</h1>
 
             @if ($talentShow->show_live_scores && $scores && $scores['votes_count'] > 0)
@@ -94,7 +66,7 @@
                     @endif
                 </p>
                 <p class="text-lg sm:text-2xl md:text-3xl text-gray-400 mt-2">
-                    Μέσος όρος: {{ number_format($scores['average_score'], 2, ',', '') }} / 10
+                    Μέσος όρος: {{ number_format($scores['average_score'], 2, ',', '') }} / 12
                 </p>
                 @if (! $scores['is_complete'])
                     <p class="text-base sm:text-xl text-indigo-300 mt-3">
@@ -108,22 +80,10 @@
                 </p>
             @endif
         </div>
+    @elseif (in_array($talentShow->status->value, ['scoring_closed', 'results_ready', 'winner_revealed'], true))
+        <h1 class="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-500 text-center">Αναμονή αποτελεσμάτων...</h1>
     @else
-        @if ($talentShow->shouldDisplayWaitingVideo())
-            @include('livewire.presentation.partials.fullscreen-video', [
-                'videoUrl' => $talentShow->waitingVideoUrl(),
-                'wireKey' => 'waiting-'.$talentShow->id.'-'.$talentShow->waiting_video_path,
-                'label' => null,
-                'loop' => true,
-            ])
-        @elseif ($talentShow->shouldDisplayWaitingImage())
-            <div class="text-center w-full px-2">
-                <img src="{{ $talentShow->waitingImageUrl() }}" alt=""
-                     class="screen-media w-full max-w-4xl mx-auto rounded-2xl shadow-2xl object-contain max-h-[80vh]">
-            </div>
-        @else
-            <h1 class="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-500 text-center">Αναμονή έναρξης...</h1>
-        @endif
+        <h1 class="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-500 text-center">Αναμονή έναρξης...</h1>
     @endif
     </div>
 </div>

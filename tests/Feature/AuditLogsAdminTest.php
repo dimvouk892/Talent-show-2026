@@ -29,9 +29,9 @@ class AuditLogsAdminTest extends TalentShowTestCase
         $vote = app(VoteService::class)->submit(
             $this->show->judges()->first(),
             $this->show->currentTeam,
-            7,
+            9,
         );
-        app(VoteService::class)->correct($vote, 9, 'Διόρθωση λάθους', $this->admin);
+        app(VoteService::class)->correct($vote, 12, 'Διόρθωση λάθους', $this->admin);
 
         $this->assertGreaterThan(0, app(AuditLogService::class)->queryForTalentShow($this->show)->count());
 

@@ -32,6 +32,13 @@
                     <input type="checkbox" wire:model="is_active" class="w-5 h-5 rounded">
                     <span>Ενεργός</span>
                 </label>
+                <label class="flex items-start gap-3 min-h-12">
+                    <input type="checkbox" wire:model="is_final_voter" class="w-5 h-5 mt-0.5 rounded shrink-0">
+                    <span>
+                        Κριτής τελικής ψήφου
+                        <span class="block text-xs text-gray-500 font-normal">Ψηφίζει μόνο στο τέλος, μία ομάδα, πριν τα αποτελέσματα. Μόνο ένας ανά show.</span>
+                    </span>
+                </label>
             </div>
             <div class="flex flex-col sm:flex-row gap-2">
                 <button type="submit" class="w-full sm:w-auto btn-touch bg-indigo-600 text-white">Αποθήκευση</button>
@@ -72,6 +79,9 @@
                             <span class="px-2 py-1 rounded-lg {{ $judge->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
                                 {{ $judge->is_active ? 'Ενεργός' : 'Ανενεργός' }}
                             </span>
+                            @if ($judge->is_final_voter)
+                                <span class="px-2 py-1 rounded-lg bg-amber-100 text-amber-800">Τελική ψήφος</span>
+                            @endif
                             <span class="px-2 py-1 rounded-lg {{ $status['has_active_session'] ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600' }}">
                                 {{ $status['has_active_session'] ? 'Συνδεδεμένος' : 'Αποσυνδεδεμένος' }}
                             </span>

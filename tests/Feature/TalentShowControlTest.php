@@ -4,12 +4,9 @@ namespace Tests\Feature;
 
 use App\Enums\TalentShowStatus;
 use App\Enums\TeamStatus;
-use App\Models\AuditLog;
-use App\Models\Judge;
 use App\Models\Team;
 use App\Models\Vote;
 use App\Models\VoteRevision;
-use App\Services\ResultsService;
 use App\Services\ScoreCalculationService;
 use App\Services\TalentShowControlService;
 use App\Services\VoteService;
@@ -24,7 +21,7 @@ class TalentShowControlTest extends TalentShowTestCase
     {
         $team = $this->show->currentTeam;
         foreach ($this->show->judges as $judge) {
-            app(VoteService::class)->submit($judge, $team, 8);
+            app(VoteService::class)->submit($judge, $team, 10);
         }
     }
 
@@ -32,7 +29,7 @@ class TalentShowControlTest extends TalentShowTestCase
     {
         $this->openScoring();
         $judge = $this->show->judges()->first();
-        app(VoteService::class)->submit($judge, $this->show->currentTeam, 7);
+        app(VoteService::class)->submit($judge, $this->show->currentTeam, 9);
 
         $this->show->update(['show_live_scores' => false]);
 
@@ -41,14 +38,31 @@ class TalentShowControlTest extends TalentShowTestCase
         $this->assertTrue($this->show->fresh()->show_live_scores);
     }
 
-    public function test_first_vote_enables_live_scores_on_presentation(): void
+    public function test_votes_do_not_auto_reveal_live_scores_on_presentation(): void
     {
         $this->openScoring();
         $this->assertFalse($this->show->show_live_scores);
 
-        app(VoteService::class)->submit($this->show->judges()->first(), $this->show->currentTeam, 8);
+        app(VoteService::class)->submit($this->show->judges()->first(), $this->show->currentTeam, 10);
+
+        $this->assertFalse($this->show->fresh()->show_live_scores);
+
+        app(TalentShowControlService::class)->revealScores($this->show->fresh());
 
         $this->assertTrue($this->show->fresh()->show_live_scores);
+    }
+
+    public function test_start_voting_button_hidden_after_scoring_starts(): void
+    {
+        $control = app(TalentShowControlService::class);
+
+        $this->assertTrue($control->canOpenScoring($this->show));
+
+        $this->openScoring();
+        $this->assertFalse($control->canOpenScoring($this->show->fresh()));
+
+        $this->show->update(['status' => \App\Enums\TalentShowStatus::ScoringClosed]);
+        $this->assertFalse($control->canOpenScoring($this->show->fresh()));
     }
 
     public function test_partial_scores_visible_before_all_judges_vote(): void
@@ -67,20 +81,10 @@ class TalentShowControlTest extends TalentShowTestCase
     {
         $this->openScoring();
         $judge = $this->show->judges()->first();
-        app(VoteService::class)->submit($judge, $this->show->currentTeam, 7);
+        app(VoteService::class)->submit($judge, $this->show->currentTeam, 9);
 
         $this->expectException(InvalidArgumentException::class);
         app(TalentShowControlService::class)->nextTeam($this->show);
-    }
-
-    public function test_cannot_proceed_during_team_intro(): void
-    {
-        $team = $this->show->teams()->ordered()->first();
-        $team->update(['video_path' => 'teams/'.$this->show->id.'/videos/intro.mp4']);
-
-        app(TalentShowControlService::class)->openScoring($this->show->fresh());
-
-        $this->assertFalse(app(TalentShowControlService::class)->canProceedToNext($this->show->fresh()));
     }
 
     public function test_only_one_team_active(): void
@@ -112,17 +116,14 @@ class TalentShowControlTest extends TalentShowTestCase
         $control = app(TalentShowControlService::class);
         $control->openScoring($this->show);
         $teams = $this->show->activeTeams()->ordered()->get();
+        $roundScores = [9, 10, 12];
 
         foreach ($teams as $index => $team) {
             $this->show->refresh();
             foreach ($this->show->judges as $judge) {
-                app(VoteService::class)->submit($judge, $this->show->currentTeam, 7 + $index);
+                app(VoteService::class)->submit($judge, $this->show->currentTeam, $roundScores[$index % 3]);
             }
-            if ($index < $teams->count() - 1) {
-                $control->nextTeam($this->show->fresh());
-            } else {
-                $control->nextTeam($this->show->fresh());
-            }
+            $control->nextTeam($this->show->fresh());
         }
 
         $this->show->refresh();
@@ -134,14 +135,14 @@ class TalentShowControlTest extends TalentShowTestCase
     {
         $this->openScoring();
         $team = $this->show->currentTeam;
-        $scores = [8, 9, 7, 8, 9];
+        $scores = [10, 12, 9, 10, 12];
 
         foreach ($this->show->judges as $i => $judge) {
             app(VoteService::class)->submit($judge, $team, $scores[$i]);
         }
 
         $result = app(ScoreCalculationService::class)->forTeam($team->fresh());
-        $this->assertEquals(41, $result['total_score']);
+        $this->assertEquals(53, $result['total_score']);
     }
 
     public function test_average_score_calculated_correctly(): void
@@ -150,18 +151,18 @@ class TalentShowControlTest extends TalentShowTestCase
         $team = $this->show->currentTeam;
 
         foreach ($this->show->judges as $judge) {
-            app(VoteService::class)->submit($judge, $team, 8);
+            app(VoteService::class)->submit($judge, $team, 10);
         }
 
         $result = app(ScoreCalculationService::class)->forTeam($team->fresh());
-        $this->assertEquals(8.0, $result['average_score']);
+        $this->assertEquals(10.0, $result['average_score']);
     }
 
     public function test_maximum_score_is_correct(): void
     {
         $this->openScoring();
         $result = app(ScoreCalculationService::class)->forTeam($this->show->currentTeam);
-        $this->assertEquals(50, $result['maximum_score']);
+        $this->assertEquals(60, $result['maximum_score']);
     }
 
     public function test_cannot_start_without_active_judges(): void
@@ -184,7 +185,7 @@ class TalentShowControlTest extends TalentShowTestCase
     {
         $this->openScoring();
         $team = $this->show->currentTeam;
-        app(VoteService::class)->submit($this->show->judges()->first(), $team, 5);
+        app(VoteService::class)->submit($this->show->judges()->first(), $team, 9);
 
         $this->assertTrue($team->hasVotes());
     }
@@ -193,7 +194,7 @@ class TalentShowControlTest extends TalentShowTestCase
     {
         $this->openScoring();
         $judge = $this->show->judges()->first();
-        app(VoteService::class)->submit($judge, $this->show->currentTeam, 5);
+        app(VoteService::class)->submit($judge, $this->show->currentTeam, 9);
 
         $this->assertTrue($judge->hasVotes());
     }
@@ -251,7 +252,7 @@ class TalentShowControlTest extends TalentShowTestCase
     public function test_clear_scores_via_live_control_modal(): void
     {
         $this->openScoring();
-        app(VoteService::class)->submit($this->show->judges()->first(), $this->show->currentTeam, 8);
+        app(VoteService::class)->submit($this->show->judges()->first(), $this->show->currentTeam, 10);
 
         Livewire::actingAs($this->admin)
             ->test(LiveControl::class, ['talentShow' => $this->show])
@@ -269,16 +270,16 @@ class TalentShowControlTest extends TalentShowTestCase
     {
         $this->openScoring();
         $judge = $this->show->judges()->first();
-        app(VoteService::class)->submit($judge, $this->show->currentTeam, 8);
+        app(VoteService::class)->submit($judge, $this->show->currentTeam, 10);
 
         app(TalentShowControlService::class)->restartShow($this->show->fresh());
 
         $this->show->refresh();
         $team = $this->show->currentTeam;
 
-        $vote = app(VoteService::class)->submit($judge, $team, 7);
+        $vote = app(VoteService::class)->submit($judge, $team, 9);
 
-        $this->assertEquals(7, $vote->score);
+        $this->assertEquals(9, $vote->score);
         $this->assertEquals(1, Vote::where('talent_show_id', $this->show->id)->count());
     }
 
@@ -287,8 +288,8 @@ class TalentShowControlTest extends TalentShowTestCase
         Livewire::actingAs($this->admin)
             ->test(LiveControl::class, ['talentShow' => $this->show])
             ->call('openScoring')
-            ->assertSet('flashSuccess', 'Η βαθμολόγηση άνοιξε.')
-            ->assertSee('Η βαθμολόγηση άνοιξε.');
+            ->assertSet('flashSuccess', 'Η ψηφοφορία ξεκίνησε.')
+            ->assertSee('Η ψηφοφορία ξεκίνησε.');
     }
 
     public function test_can_start_with_one_active_judge(): void
@@ -333,7 +334,7 @@ class TalentShowControlTest extends TalentShowTestCase
     public function test_restart_works_with_any_number_of_active_judges(): void
     {
         $this->openScoring();
-        app(VoteService::class)->submit($this->show->judges()->first(), $this->show->currentTeam, 8);
+        app(VoteService::class)->submit($this->show->judges()->first(), $this->show->currentTeam, 10);
 
         $this->show->judges()->update(['is_active' => false]);
         $this->show->judges()->limit(2)->update(['is_active' => true]);

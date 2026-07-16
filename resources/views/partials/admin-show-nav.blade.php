@@ -4,7 +4,6 @@
         ['route' => 'admin.talent-shows.teams', 'label' => 'Ομάδες'],
         ['route' => 'admin.talent-shows.judges', 'label' => 'Κριτές'],
         ['route' => 'admin.talent-shows.live-control', 'label' => 'Ζωντανός έλεγχος'],
-        ['route' => 'admin.talent-shows.screen-videos', 'label' => 'Videos στην οθόνη'],
         ['route' => 'admin.talent-shows.results', 'label' => 'Αποτελέσματα'],
         ['route' => 'admin.talent-shows.audit-logs', 'label' => 'Ιστορικό'],
     ];
@@ -29,9 +28,13 @@
                 {{ $link['label'] }}
             </a>
         @endforeach
-        <a href="{{ route('presentation.show', $talentShow) }}" target="_blank" rel="noopener"
+        <a href="{{ route('presentation.show') }}" target="_blank" rel="noopener"
            class="btn-touch-sm w-full lg:w-auto text-center bg-gray-800 text-white hover:bg-gray-700">
-            Παρουσίαση ↗
+            Monitor ↗
+        </a>
+        <a href="{{ route('presentation.panel') }}" target="_blank" rel="noopener"
+           class="btn-touch-sm w-full lg:w-auto text-center bg-indigo-600 text-white hover:bg-indigo-500 border border-indigo-500">
+            Panel ↗
         </a>
     </div>
 </nav>

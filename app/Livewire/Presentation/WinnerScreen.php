@@ -12,9 +12,9 @@ class WinnerScreen extends Component
 {
     public TalentShow $talentShow;
 
-    public function mount(TalentShow $talentShow): void
+    public function mount(): void
     {
-        $this->talentShow = $talentShow;
+        $this->talentShow = TalentShow::forMonitor();
     }
 
     public function render(ResultsService $resultsService)

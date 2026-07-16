@@ -5,7 +5,6 @@ namespace App\Livewire\Presentation;
 use App\Models\TalentShow;
 use App\Services\ResultsService;
 use App\Services\ScoreCalculationService;
-use App\Services\TalentShowControlService;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -14,27 +13,9 @@ class ShowScreen extends Component
 {
     public TalentShow $talentShow;
 
-    public function mount(TalentShow $talentShow): void
+    public function mount(): void
     {
-        $this->talentShow = $talentShow;
-    }
-
-    public function finishIntro(TalentShowControlService $control): void
-    {
-        $control->dismissTeamIntro($this->talentShow);
-        $this->talentShow->refresh();
-    }
-
-    public function finishOpeningVideo(TalentShowControlService $control): void
-    {
-        $control->dismissOpeningVideo($this->talentShow);
-        $this->talentShow->refresh();
-    }
-
-    public function finishClosingVideo(TalentShowControlService $control): void
-    {
-        $control->dismissClosingVideo($this->talentShow);
-        $this->talentShow->refresh();
+        $this->talentShow = TalentShow::forMonitor();
     }
 
     public function render(
@@ -74,14 +55,6 @@ class ShowScreen extends Component
     {
         $show = $this->talentShow;
 
-        if ($show->showing_closing_video && $show->closing_video_path) {
-            return 'closing';
-        }
-
-        if ($show->showing_opening_video && $show->opening_video_path) {
-            return 'opening';
-        }
-
         if ($winner && $show->winner_revealed) {
             return 'winner';
         }
@@ -90,20 +63,8 @@ class ShowScreen extends Component
             return 'ranking';
         }
 
-        if ($currentTeam && $show->showing_team_intro && $currentTeam->video_path) {
-            return 'intro-'.$currentTeam->id;
-        }
-
         if ($currentTeam) {
             return 'team-'.$currentTeam->id;
-        }
-
-        if ($show->shouldDisplayWaitingVideo()) {
-            return 'waiting-video';
-        }
-
-        if ($show->shouldDisplayWaitingImage()) {
-            return 'waiting-image';
         }
 
         return 'waiting-text';

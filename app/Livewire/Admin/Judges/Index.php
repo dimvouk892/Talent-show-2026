@@ -24,6 +24,8 @@ class Index extends Component
 
     public bool $is_active = true;
 
+    public bool $is_final_voter = false;
+
     public bool $revokePreviousSessions = true;
 
     public ?string $flashSuccess = null;
@@ -162,6 +164,7 @@ class Index extends Component
         $this->name = $judge->name;
         $this->title = $judge->title ?? '';
         $this->is_active = $judge->is_active;
+        $this->is_final_voter = $judge->is_final_voter;
         $this->showForm = true;
     }
 
@@ -171,6 +174,7 @@ class Index extends Component
             'name' => ['required', 'string', 'max:255'],
             'title' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
+            'is_final_voter' => ['boolean'],
         ]);
 
         $talentShow = $this->getTalentShow();
@@ -182,7 +186,15 @@ class Index extends Component
                 'name' => $this->name,
                 'title' => $this->title ?: null,
                 'is_active' => $this->is_active,
+                'is_final_voter' => $this->is_final_voter,
             ]);
+
+            if ($this->is_final_voter) {
+                $talentShow->judges()
+                    ->where('id', '!=', $judge->id)
+                    ->where('is_final_voter', true)
+                    ->update(['is_final_voter' => false]);
+            }
 
             if ($wasActive && ! $this->is_active) {
                 app(JudgeAccessService::class)->revokeAllSessions($judge);
@@ -190,12 +202,21 @@ class Index extends Component
 
             $this->notifySuccess('Ο κριτής ενημερώθηκε.');
         } else {
-            $talentShow->judges()->create([
+            $judge = $talentShow->judges()->create([
                 'name' => $this->name,
                 'title' => $this->title ?: null,
                 'display_order' => ($talentShow->judges()->max('display_order') ?? 0) + 1,
                 'is_active' => $this->is_active,
+                'is_final_voter' => $this->is_final_voter,
             ]);
+
+            if ($this->is_final_voter) {
+                $talentShow->judges()
+                    ->where('id', '!=', $judge->id)
+                    ->where('is_final_voter', true)
+                    ->update(['is_final_voter' => false]);
+            }
+
             $this->notifySuccess('Ο κριτής δημιουργήθηκε.');
         }
 
@@ -282,6 +303,7 @@ class Index extends Component
         $this->name = '';
         $this->title = '';
         $this->is_active = true;
+        $this->is_final_voter = false;
     }
 
     public function render(QrCodeService $qrCodeService)

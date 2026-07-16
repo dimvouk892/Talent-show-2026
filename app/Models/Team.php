@@ -6,7 +6,6 @@ use App\Enums\TeamStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\Storage;
 
 class Team extends Model
 {
@@ -15,8 +14,6 @@ class Team extends Model
         'name',
         'code',
         'description',
-        'photo_path',
-        'video_path',
         'display_order',
         'status',
         'is_active',
@@ -53,29 +50,6 @@ class Team extends Model
     public function scopeOrdered($query)
     {
         return $query->orderBy('display_order')->orderBy('id');
-    }
-
-    public function photoUrl(): ?string
-    {
-        if (! $this->photo_path) {
-            return null;
-        }
-
-        return Storage::disk('public')->url($this->photo_path);
-    }
-
-    public function videoUrl(): ?string
-    {
-        if (! $this->video_path) {
-            return null;
-        }
-
-        return Storage::disk('public')->url($this->video_path);
-    }
-
-    public function hasIntroVideo(): bool
-    {
-        return (bool) $this->video_path;
     }
 
     public function hasVotes(): bool

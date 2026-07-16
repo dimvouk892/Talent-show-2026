@@ -36,7 +36,7 @@ class DashboardTalentShowTest extends TalentShowTestCase
     public function test_dashboard_can_delete_show_with_votes(): void
     {
         $this->openScoring();
-        app(VoteService::class)->submit($this->show->judges()->first(), $this->show->currentTeam, 8);
+        app(VoteService::class)->submit($this->show->judges()->first(), $this->show->currentTeam, 10);
 
         $showId = $this->show->id;
 

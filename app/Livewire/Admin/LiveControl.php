@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\Judge;
 use App\Models\TalentShow;
+use App\Models\Team;
 use App\Models\Vote;
 use App\Services\JudgeAccessService;
 use App\Services\ResultsService;
@@ -24,7 +26,19 @@ class LiveControl extends Component
 
     public ?int $correctingVoteId = null;
 
-    public int $correctionScore = 5;
+    public ?int $proxyJudgeId = null;
+
+    public bool $showFinalVoteForm = false;
+
+    public ?int $finalVoteId = null;
+
+    public ?int $finalVoteTeamId = null;
+
+    public int $finalVoteScore = 12;
+
+    public string $finalVoteReason = '';
+
+    public int $correctionScore = 9;
 
     public string $correctionReason = '';
 
@@ -85,8 +99,15 @@ class LiveControl extends Component
     public function openScoring(TalentShowControlService $control): void
     {
         try {
-            $control->openScoring($this->getTalentShow());
-            $this->notifySuccess('Η βαθμολόγηση άνοιξε.');
+            $talentShow = $this->getTalentShow();
+
+            // Αν η εκδήλωση δεν είναι σε draft/ready, καθαρίζουμε και ξεκινάμε από την αρχή.
+            if (! in_array($talentShow->status->value, ['draft', 'ready'], true) || $talentShow->votes()->exists()) {
+                $talentShow = $control->clearScores($talentShow);
+            }
+
+            $control->openScoring($talentShow);
+            $this->notifySuccess('Η ψηφοφορία ξεκίνησε.');
         } catch (InvalidArgumentException $e) {
             $this->notifyError($e->getMessage());
         }
@@ -108,12 +129,6 @@ class LiveControl extends Component
         $this->notifySuccess('Αποκρύφθηκε το σκορ.');
     }
 
-    public function dismissTeamIntro(TalentShowControlService $control): void
-    {
-        $control->dismissTeamIntro($this->getTalentShow());
-        $this->notifySuccess('Ξεκίνησε η παρουσίαση της ομάδας.');
-    }
-
     public function confirmNext(): void
     {
         $this->showNextConfirm = true;
@@ -133,13 +148,32 @@ class LiveControl extends Component
     public function closeScoring(TalentShowControlService $control): void
     {
         $control->closeScoring($this->getTalentShow());
-        $this->notifySuccess('Η βαθμολόγηση έκλεισε.');
+        $talentShow = $this->getTalentShow();
+        $this->notifySuccess(
+            $talentShow->final_vote_open
+                ? 'Η βαθμολόγηση έκλεισε. Αναμονή τελικής ψήφου.'
+                : 'Η βαθμολόγηση έκλεισε.'
+        );
+    }
+
+    public function openFinalVote(TalentShowControlService $control): void
+    {
+        try {
+            $control->openFinalVote($this->getTalentShow());
+            $this->notifySuccess('Η τελική ψήφος άνοιξε για τον ειδικό κριτή.');
+        } catch (InvalidArgumentException $e) {
+            $this->notifyError($e->getMessage());
+        }
     }
 
     public function showRanking(TalentShowControlService $control): void
     {
-        $control->showRanking($this->getTalentShow());
-        $this->notifySuccess('Εμφανίστηκε η κατάταξη.');
+        try {
+            $control->showRanking($this->getTalentShow());
+            $this->notifySuccess('Εμφανίστηκε η κατάταξη.');
+        } catch (InvalidArgumentException $e) {
+            $this->notifyError($e->getMessage());
+        }
     }
 
     public function revealWinner(TalentShowControlService $control, ResultsService $results): void
@@ -250,24 +284,137 @@ class LiveControl extends Component
     {
         $vote = Vote::findOrFail($voteId);
         $this->correctingVoteId = $vote->id;
+        $this->proxyJudgeId = null;
         $this->correctionScore = $vote->score;
         $this->correctionReason = '';
         $this->showCorrectionForm = true;
     }
 
+    public function openProxyVote(int $judgeId): void
+    {
+        $judge = Judge::where('talent_show_id', $this->talentShowId)->findOrFail($judgeId);
+        $this->proxyJudgeId = $judge->id;
+        $this->correctingVoteId = null;
+        $this->correctionScore = 9;
+        $this->correctionReason = 'Καταχώρηση από διαχειριστή λόγω προβλήματος συσκευής';
+        $this->showCorrectionForm = true;
+    }
+
+    public function closeScoreForm(): void
+    {
+        $this->showCorrectionForm = false;
+        $this->correctingVoteId = null;
+        $this->proxyJudgeId = null;
+        $this->correctionReason = '';
+    }
+
+    public function openFinalVoteForm(): void
+    {
+        $talentShow = $this->getTalentShow();
+        $finalVoter = $talentShow->finalVoter();
+
+        if (! $finalVoter) {
+            $this->notifyError('Δεν υπάρχει κριτής τελικής ψήφου.');
+
+            return;
+        }
+
+        $existing = $finalVoter->votes()->where('talent_show_id', $talentShow->id)->first();
+
+        $this->finalVoteId = $existing?->id;
+        $this->finalVoteTeamId = $existing?->team_id;
+        $this->finalVoteScore = $existing?->score ?? 12;
+        $this->finalVoteReason = $existing
+            ? 'Διόρθωση τελικής ψήφου από διαχειριστή'
+            : 'Καταχώρηση τελικής ψήφου από διαχειριστή';
+        $this->showFinalVoteForm = true;
+    }
+
+    public function closeFinalVoteForm(): void
+    {
+        $this->showFinalVoteForm = false;
+        $this->finalVoteId = null;
+        $this->finalVoteTeamId = null;
+        $this->finalVoteReason = '';
+        $this->finalVoteScore = 12;
+    }
+
+    public function saveFinalVote(VoteService $voteService): void
+    {
+        $this->validate([
+            'finalVoteTeamId' => ['required', 'integer'],
+            'finalVoteScore' => ['required', 'integer', 'in:9,10,12'],
+            'finalVoteReason' => ['required', 'string', 'min:5'],
+        ]);
+
+        try {
+            $talentShow = $this->getTalentShow();
+            $finalVoter = $talentShow->finalVoter();
+            $team = Team::where('talent_show_id', $talentShow->id)->findOrFail($this->finalVoteTeamId);
+
+            if (! $finalVoter) {
+                throw new InvalidArgumentException('Δεν υπάρχει κριτής τελικής ψήφου.');
+            }
+
+            if ($this->finalVoteId) {
+                $vote = Vote::findOrFail($this->finalVoteId);
+                $voteService->correctFinalVote(
+                    $vote,
+                    $team,
+                    $this->finalVoteScore,
+                    $this->finalVoteReason,
+                    auth()->user(),
+                );
+                $this->notifySuccess('Η τελική ψήφος διορθώθηκε.');
+            } else {
+                $voteService->submitFinalVoteOnBehalf(
+                    $finalVoter,
+                    $team,
+                    $this->finalVoteScore,
+                    $this->finalVoteReason,
+                    auth()->user(),
+                );
+                $this->notifySuccess('Καταχωρίστηκε η τελική ψήφος.');
+            }
+
+            $this->closeFinalVoteForm();
+        } catch (InvalidArgumentException $e) {
+            $this->notifyError($e->getMessage());
+        }
+    }
+
     public function correctVote(VoteService $voteService): void
     {
         $this->validate([
-            'correctionScore' => ['required', 'integer', 'min:1', 'max:10'],
+            'correctionScore' => ['required', 'integer', 'in:9,10,12'],
             'correctionReason' => ['required', 'string', 'min:5'],
         ]);
 
         try {
-            $vote = Vote::findOrFail($this->correctingVoteId);
-            $voteService->correct($vote, $this->correctionScore, $this->correctionReason, auth()->user());
-            $this->showCorrectionForm = false;
-            $this->correctingVoteId = null;
-            $this->notifySuccess('Η βαθμολογία διορθώθηκε.');
+            if ($this->proxyJudgeId) {
+                $talentShow = $this->getTalentShow();
+                $team = $talentShow->currentTeam;
+
+                if (! $team) {
+                    throw new InvalidArgumentException('Δεν υπάρχει ενεργή ομάδα.');
+                }
+
+                $judge = Judge::findOrFail($this->proxyJudgeId);
+                $voteService->submitOnBehalf(
+                    $judge,
+                    $team,
+                    $this->correctionScore,
+                    $this->correctionReason,
+                    auth()->user(),
+                );
+                $this->notifySuccess('Καταχωρίστηκε βαθμός για '.$judge->name.'.');
+            } else {
+                $vote = Vote::findOrFail($this->correctingVoteId);
+                $voteService->correct($vote, $this->correctionScore, $this->correctionReason, auth()->user());
+                $this->notifySuccess('Η βαθμολογία διορθώθηκε.');
+            }
+
+            $this->closeScoreForm();
         } catch (InvalidArgumentException $e) {
             $this->notifyError($e->getMessage());
         }
@@ -287,6 +434,10 @@ class LiveControl extends Component
             : [];
         $canProceed = $control->canProceedToNext($talentShow);
         $tiedTeams = $resultsService->getTiedTeams($talentShow);
+        $finalVoter = $talentShow->finalVoter();
+        $finalVote = $finalVoter
+            ? $finalVoter->votes()->where('talent_show_id', $talentShow->id)->with('team')->first()
+            : null;
 
         return view('livewire.admin.live-control', [
             'talentShow' => $talentShow,
@@ -301,7 +452,12 @@ class LiveControl extends Component
             'canRevealScores' => $control->canRevealScores($talentShow),
             'canHideScores' => $control->canHideScores($talentShow),
             'canCloseScoring' => $control->canCloseScoring($talentShow),
+            'canOpenFinalVote' => $control->canOpenFinalVote($talentShow),
             'canShowRanking' => $control->canShowRanking($talentShow),
+            'hasPendingFinalVote' => $talentShow->hasPendingFinalVote(),
+            'finalVoter' => $finalVoter,
+            'finalVote' => $finalVote,
+            'teams' => $talentShow->activeTeams()->ordered()->get(),
             'canRevealWinner' => $control->canRevealWinner($talentShow),
             'canCompleteShow' => $control->canCompleteShow($talentShow),
         ]);

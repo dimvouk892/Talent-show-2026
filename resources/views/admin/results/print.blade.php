@@ -7,14 +7,14 @@
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; }
         body {
-            font-family: sans-serif;
+            font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
             color: #111;
             background: #e5e7eb;
-            font-size: 11pt;
-            line-height: 1.35;
+            font-size: 10pt;
+            line-height: 1.3;
         }
         .actions {
-            max-width: 210mm;
+            max-width: 297mm;
             margin: 16px auto 0;
             padding: 0 12px;
         }
@@ -28,110 +28,148 @@
             color: #fff;
         }
         .sheet {
-            width: 210mm;
-            min-height: 297mm;
+            width: 297mm;
+            min-height: 210mm;
             margin: 16px auto 24px;
-            padding: 15mm 12mm;
+            padding: 10mm 12mm;
             background: #fff;
             box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
         }
-        h1 { margin: 0 0 4px; font-size: 18pt; }
-        h2 { margin: 16pt 0 8pt; font-size: 13pt; page-break-after: avoid; }
-        .meta { color: #555; margin-bottom: 14pt; font-size: 9pt; }
+        h1 { margin: 0 0 4px; font-size: 16pt; }
+        h2 {
+            margin: 12pt 0 6pt;
+            font-size: 12pt;
+            page-break-after: avoid;
+            break-after: avoid;
+        }
+        .meta { color: #555; margin-bottom: 10pt; font-size: 8.5pt; }
         .summary {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 8pt;
-            margin-bottom: 14pt;
+            gap: 6pt;
+            margin-bottom: 10pt;
         }
         .summary div {
             border: 1px solid #ddd;
             border-radius: 6px;
-            padding: 8pt;
-            font-size: 8pt;
+            padding: 6pt 8pt;
+            font-size: 7.5pt;
         }
-        .summary strong { display: block; font-size: 14pt; margin-top: 3pt; }
+        .summary strong { display: block; font-size: 13pt; margin-top: 2pt; }
         .winner {
             background: #fef9c3;
             border: 1px solid #facc15;
             border-radius: 6px;
-            padding: 10pt;
-            margin-bottom: 14pt;
-            font-size: 10pt;
+            padding: 8pt;
+            margin-bottom: 10pt;
+            font-size: 9.5pt;
         }
-        table {
+        .table-section {
+            width: 100%;
+        }
+        table.scores {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 6pt;
-            font-size: 8.5pt;
+            table-layout: fixed;
+            font-size: 7.5pt;
+            margin-top: 4pt;
         }
-        th, td {
+        table.scores th,
+        table.scores td {
             border: 1px solid #bbb;
-            padding: 4pt 5pt;
+            padding: 3pt 2pt;
             text-align: center;
             vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
         }
-        th {
+        table.scores th {
             background: #f3f4f6;
-            font-size: 7.5pt;
+            font-size: 6.5pt;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        table.scores th.final-voter,
+        table.scores td.final-voter {
+            background: #fffbeb;
+        }
+        table.scores th.final-total,
+        table.scores td.final-total {
+            background: #eef2ff;
+            font-weight: 700;
+        }
+        table.scores col.col-rank { width: 6%; }
+        table.scores col.col-team { width: 16%; }
+        table.scores col.col-judge { width: auto; }
+        table.scores col.col-final-voter { width: 9%; }
+        table.scores col.col-final-score { width: 8%; }
+        table.scores col.col-total { width: 8%; }
+        table.scores col.col-avg { width: 6%; }
+        td.team {
+            text-align: left;
             font-weight: 600;
+            padding-left: 4pt;
+            padding-right: 4pt;
         }
-        td.team { text-align: left; font-weight: 600; max-width: 42mm; word-wrap: break-word; }
-        td.pos { font-weight: 700; width: 12mm; }
-        .partial { color: #c2410c; font-size: 7pt; }
-        .footnote {
-            margin-top: 10pt;
-            color: #666;
-            font-size: 7.5pt;
-            page-break-inside: avoid;
-        }
+        td.pos { font-weight: 700; }
+        .partial { color: #c2410c; font-size: 6.5pt; }
         .charts-section {
-            margin: 12pt 0 16pt;
+            margin: 12pt 0 0;
             page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-before: auto;
+            break-before: auto;
         }
         .charts-section h2 { margin-top: 0; }
-        .chart-block {
-            margin-bottom: 14pt;
-            page-break-inside: avoid;
-        }
-        .chart-block h3 {
+        .chart-subtitle {
             margin: 0 0 6pt;
-            font-size: 10pt;
-            color: #374151;
+            font-size: 8pt;
+            color: #6b7280;
+        }
+        .chart-block {
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
         .chart-svg {
             width: 100%;
             height: auto;
             display: block;
+            max-height: 90mm;
         }
-        .chart-label { font-size: 8pt; fill: #111; }
-        .chart-value { font-size: 8pt; fill: #374151; font-weight: 600; }
-        .chart-axis { font-size: 7pt; fill: #6b7280; }
-        .chart-heat-value { font-size: 7.5pt; fill: #111; font-weight: 600; }
-        .chart-legend {
-            margin: 0;
-            font-size: 7.5pt;
-            color: #6b7280;
-        }
-        .table-section { page-break-before: auto; }
-        .page-break-avoid { page-break-inside: avoid; }
+        .chart-value { font-size: 9pt; fill: #1f2937; font-weight: 700; }
+        .chart-winner-value { fill: #92400e; }
+        .chart-axis { font-size: 8pt; fill: #6b7280; }
+        .chart-axis-title { font-size: 8pt; fill: #6b7280; text-anchor: middle; }
+        .chart-axis-line { stroke: #9ca3af; stroke-width: 1; }
+        .chart-grid { stroke: #e5e7eb; stroke-width: 1; }
+        .chart-x-label { font-size: 7.5pt; fill: #111; }
         thead { display: table-header-group; }
-        tr { page-break-inside: avoid; }
+        tfoot { display: table-footer-group; }
+        tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
 
         @page {
-            size: A4 portrait;
-            margin: 15mm 12mm;
+            size: A4 landscape;
+            margin: 10mm 10mm;
         }
 
         @media print {
             body { background: #fff; }
-            .actions { display: none; }
+            .actions { display: none !important; }
             .sheet {
                 width: auto;
                 min-height: auto;
                 margin: 0;
                 padding: 0;
                 box-shadow: none;
+            }
+            table.scores {
+                font-size: 7pt;
+            }
+            table.scores th {
+                font-size: 6pt;
             }
         }
     </style>
@@ -148,6 +186,7 @@
             @if ($talentShow->event_date) · {{ $talentShow->event_date->format('d/m/Y') }}@endif
             @if ($talentShow->venue) · {{ $talentShow->venue }}@endif
             · {{ $report['summary']['show_status'] }}
+            · A4 οριζόντια
         </p>
 
         <div class="summary">
@@ -165,58 +204,104 @@
             </div>
         @endif
 
-        @if (count($chartItems) > 0)
-            @include('admin.results.partials.print-charts')
-        @endif
-
         <div class="table-section">
-        <h2>Αναλυτικός πίνακας βαθμών</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Θέση</th>
-                    <th>Ομάδα</th>
-                    @foreach ($report['judges'] as $judge)
-                        <th>{{ $judge->name }}</th>
+            <h2>Πίνακας βαθμολογιών</h2>
+            <table class="scores">
+                <colgroup>
+                    <col class="col-rank">
+                    <col class="col-team">
+                    @foreach ($scoringJudges as $judge)
+                        <col class="col-judge">
                     @endforeach
-                    <th>Σύνολο</th>
-                    <th>Μ.Ο.</th>
-                    <th>10/9</th>
-                    <th>Ψήφοι</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach ($report['ranking'] as $item)
+                    @if ($finalVoter)
+                        <col class="col-final-voter">
+                    @endif
+                    <col class="col-final-score">
+                    <col class="col-total">
+                    <col class="col-avg">
+                </colgroup>
+                <thead>
                     <tr>
-                        <td class="pos">
-                            @if ($item['ranking_position'])
-                                {{ $item['ranking_position'] }}η
-                            @else
-                                <span class="partial">Μερικό</span>
-                            @endif
-                        </td>
-                        <td class="team">{{ $item['team']->name }}</td>
-                        @foreach ($report['judges'] as $judge)
-                            @php $score = collect($item['judge_scores'])->firstWhere('judge_id', $judge->id); @endphp
-                            <td>
-                                @if ($score && $score['has_voted'])
-                                    {{ $score['score'] }}@if ($score['is_admin_edited'])*@endif
+                        <th>Κατάταξη</th>
+                        <th>Ομάδα</th>
+                        @foreach ($scoringJudges as $index => $judge)
+                            <th title="{{ $judge->name }}">Κριτής {{ $index + 1 }}</th>
+                        @endforeach
+                        @if ($finalVoter)
+                            <th class="final-voter" title="{{ $finalVoter->name }}">Κριτής τελικής ψήφου</th>
+                        @endif
+                        <th class="final-total">Τελική βαθμολογία</th>
+                        <th>Σύνολο</th>
+                        <th>Μ.Ο.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($report['ranking'] as $item)
+                        @php
+                            $hasAnyVote = $item['votes_count'] > 0
+                                || collect($item['judge_scores'])->contains('has_voted', true);
+                            $finalScoreEntry = collect($item['judge_scores'])->firstWhere('is_final_voter', true);
+                        @endphp
+                        <tr>
+                            <td class="pos">
+                                @if ($item['ranking_position'])
+                                    {{ $item['ranking_position'] }}η
+                                @elseif ($hasAnyVote)
+                                    <span class="partial">Μερικό</span>
                                 @else
                                     —
                                 @endif
                             </td>
-                        @endforeach
-                        <td><strong>{{ $item['total_score'] }}</strong>/{{ $item['maximum_score'] }}</td>
-                        <td>{{ number_format($item['average_score'], 2, ',', '') }}</td>
-                        <td>{{ $item['number_of_tens'] }}/{{ $item['number_of_nines'] }}</td>
-                        <td>{{ $item['votes_count'] }}/{{ $item['active_judges_count'] }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
+                            <td class="team">{{ $item['team']->name }}</td>
+                            @foreach ($scoringJudges as $judge)
+                                @php $score = collect($item['judge_scores'])->firstWhere('judge_id', $judge->id); @endphp
+                                <td>
+                                    @if ($score && $score['has_voted'])
+                                        {{ $score['score'] }}
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                            @endforeach
+                            @if ($finalVoter)
+                                <td class="final-voter">
+                                    @if ($finalScoreEntry && $finalScoreEntry['has_voted'])
+                                        {{ $finalScoreEntry['score'] }}
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                            @endif
+                            <td class="final-total">
+                                @if ($hasAnyVote)
+                                    {{ $item['total_score'] }}
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td>
+                                @if ($hasAnyVote)
+                                    {{ $item['total_score'] }}/{{ $item['maximum_score'] }}
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td>
+                                @if ($hasAnyVote)
+                                    {{ number_format($item['average_score'], 2, ',', '') }}
+                                @else
+                                    —
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
         </div>
 
-        <p class="footnote">* Διορθωμένος βαθμός από διαχειριστή · Κριτήριο ισοβαθμίας: σύνολο → 10άρια → 9άρια · Μορφή εκτύπωσης: A4</p>
+        @if (count($chartItems) > 0)
+            @include('admin.results.partials.print-charts')
+        @endif
     </div>
 </body>
 </html>

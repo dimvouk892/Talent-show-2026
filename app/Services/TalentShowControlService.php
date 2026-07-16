@@ -41,10 +41,9 @@ class TalentShowControlService
     {
         $this->validateReadyToStart($talentShow);
 
-        $talentShow->update(array_merge([
+        $talentShow->update([
             'status' => TalentShowStatus::Ready,
-            'showing_opening_video' => $talentShow->hasOpeningVideo(),
-        ], $this->waitingScreenFlags($talentShow, suppressWhileOpening: true)));
+        ]);
 
         $this->auditLogService->log(
             action: 'show_started',
@@ -76,11 +75,6 @@ class TalentShowControlService
                 'status' => TalentShowStatus::ScoringOpen,
                 'current_team_id' => $firstTeam->id,
                 'show_live_scores' => false,
-                'showing_opening_video' => false,
-                'showing_closing_video' => false,
-                'showing_waiting_video' => false,
-                'showing_waiting_image' => false,
-                'showing_team_intro' => $this->shouldShowTeamIntro($firstTeam),
             ]);
 
             $this->auditLogService->log(
@@ -172,7 +166,6 @@ class TalentShowControlService
             $talentShow->update([
                 'current_team_id' => $nextTeam->id,
                 'show_live_scores' => false,
-                'showing_team_intro' => $this->shouldShowTeamIntro($nextTeam),
             ]);
 
             $this->auditLogService->log(
@@ -189,18 +182,24 @@ class TalentShowControlService
 
     protected function completeLastTeam(TalentShow $talentShow, Team $currentTeam): TalentShow
     {
+        $hasFinalVoter = $talentShow->finalVoter() !== null;
+
         $talentShow->update([
             'current_team_id' => null,
             'show_live_scores' => false,
-            'showing_team_intro' => false,
             'status' => TalentShowStatus::ScoringClosed,
+            'final_vote_open' => $hasFinalVoter,
+            'final_vote_submitted_at' => $hasFinalVoter ? null : $talentShow->final_vote_submitted_at,
         ]);
 
         $this->auditLogService->log(
             action: 'last_team_completed',
             entityType: 'talent_show',
             entityId: $talentShow->id,
-            newValues: ['last_team_id' => $currentTeam->id],
+            newValues: [
+                'last_team_id' => $currentTeam->id,
+                'final_vote_open' => $hasFinalVoter,
+            ],
         );
 
         return $talentShow->fresh();
@@ -208,17 +207,46 @@ class TalentShowControlService
 
     public function closeScoring(TalentShow $talentShow): TalentShow
     {
+        $hasFinalVoter = $talentShow->finalVoter() !== null;
+
         $talentShow->update([
             'status' => TalentShowStatus::ScoringClosed,
             'current_team_id' => null,
             'show_live_scores' => false,
-            'showing_team_intro' => false,
+            'final_vote_open' => $hasFinalVoter,
+            'final_vote_submitted_at' => $hasFinalVoter ? null : $talentShow->final_vote_submitted_at,
         ]);
 
         $this->deactivateAllTeams($talentShow);
 
         $this->auditLogService->log(
             action: 'scoring_closed',
+            entityType: 'talent_show',
+            entityId: $talentShow->id,
+            newValues: ['final_vote_open' => $hasFinalVoter],
+        );
+
+        return $talentShow->fresh();
+    }
+
+    public function openFinalVote(TalentShow $talentShow): TalentShow
+    {
+        if ($talentShow->status !== TalentShowStatus::ScoringClosed) {
+            throw new InvalidArgumentException('Η τελική ψήφος ανοίγει μετά το κλείσιμο βαθμολόγησης.');
+        }
+
+        if (! $talentShow->finalVoter()) {
+            throw new InvalidArgumentException('Δεν υπάρχει κριτής τελικής ψήφου.');
+        }
+
+        if (! $talentShow->hasPendingFinalVote()) {
+            throw new InvalidArgumentException('Η τελική ψήφος έχει ήδη υποβληθεί.');
+        }
+
+        $talentShow->update(['final_vote_open' => true]);
+
+        $this->auditLogService->log(
+            action: 'final_vote_opened',
             entityType: 'talent_show',
             entityId: $talentShow->id,
         );
@@ -228,9 +256,14 @@ class TalentShowControlService
 
     public function showRanking(TalentShow $talentShow): TalentShow
     {
+        if ($talentShow->hasPendingFinalVote()) {
+            throw new InvalidArgumentException('Περιμένετε την τελική ψήφο του ειδικού κριτή πριν τα αποτελέσματα.');
+        }
+
         $talentShow->update([
             'show_ranking' => true,
             'status' => TalentShowStatus::ResultsReady,
+            'final_vote_open' => false,
         ]);
 
         $this->auditLogService->log(
@@ -282,14 +315,12 @@ class TalentShowControlService
     {
         $talentShow->update([
             'status' => TalentShowStatus::Completed,
-            'showing_closing_video' => $talentShow->hasClosingVideo(),
         ]);
 
         $this->auditLogService->log(
             action: 'show_completed',
             entityType: 'talent_show',
             entityId: $talentShow->id,
-            newValues: ['showing_closing_video' => $talentShow->hasClosingVideo()],
         );
 
         return $talentShow->fresh();
@@ -352,17 +383,16 @@ class TalentShowControlService
                 'scoring_completed_at' => null,
             ]);
 
-            $talentShow->update(array_merge([
+            $talentShow->update([
                 'status' => TalentShowStatus::Ready,
                 'current_team_id' => null,
                 'winner_team_id' => null,
                 'show_live_scores' => false,
-                'showing_team_intro' => false,
-                'showing_opening_video' => false,
-                'showing_closing_video' => false,
+                'final_vote_open' => false,
+                'final_vote_submitted_at' => null,
                 'show_ranking' => false,
                 'winner_revealed' => false,
-            ], $this->waitingScreenFlags($talentShow)));
+            ]);
 
             $this->auditLogService->log(
                 action: $auditAction,
@@ -375,38 +405,6 @@ class TalentShowControlService
         });
     }
 
-    /**
-     * @return array{showing_waiting_video: bool, showing_waiting_image: bool}
-     */
-    protected function waitingScreenFlags(TalentShow $talentShow, bool $suppressWhileOpening = false): array
-    {
-        if ($suppressWhileOpening && $talentShow->hasOpeningVideo()) {
-            return [
-                'showing_waiting_video' => false,
-                'showing_waiting_image' => false,
-            ];
-        }
-
-        if ($talentShow->hasWaitingVideo()) {
-            return [
-                'showing_waiting_video' => true,
-                'showing_waiting_image' => false,
-            ];
-        }
-
-        if ($talentShow->hasWaitingImage()) {
-            return [
-                'showing_waiting_video' => false,
-                'showing_waiting_image' => true,
-            ];
-        }
-
-        return [
-            'showing_waiting_video' => false,
-            'showing_waiting_image' => false,
-        ];
-    }
-
     protected function deactivateAllTeams(TalentShow $talentShow): void
     {
         $talentShow->teams()
@@ -414,225 +412,9 @@ class TalentShowControlService
             ->update(['status' => TeamStatus::Pending]);
     }
 
-    public function dismissTeamIntro(TalentShow $talentShow): TalentShow
-    {
-        if (! $talentShow->showing_team_intro) {
-            return $talentShow;
-        }
-
-        $talentShow->update(['showing_team_intro' => false]);
-
-        $this->auditLogService->log(
-            action: 'team_intro_dismissed',
-            entityType: 'talent_show',
-            entityId: $talentShow->id,
-            newValues: ['current_team_id' => $talentShow->current_team_id],
-        );
-
-        return $talentShow->fresh(['currentTeam']);
-    }
-
-    public function replayTeamIntro(TalentShow $talentShow): TalentShow
-    {
-        $team = $talentShow->currentTeam;
-
-        if (! $team) {
-            throw new InvalidArgumentException('Δεν υπάρχει ενεργή ομάδα.');
-        }
-
-        if (! $team->hasIntroVideo()) {
-            throw new InvalidArgumentException('Η ομάδα δεν έχει intro video.');
-        }
-
-        $talentShow->update([
-            'showing_team_intro' => true,
-            'showing_opening_video' => false,
-            'showing_closing_video' => false,
-            'showing_waiting_video' => false,
-            'showing_waiting_image' => false,
-        ]);
-
-        $this->auditLogService->log(
-            action: 'team_intro_replayed',
-            entityType: 'talent_show',
-            entityId: $talentShow->id,
-            newValues: ['current_team_id' => $team->id],
-        );
-
-        return $talentShow->fresh(['currentTeam']);
-    }
-
-    protected function shouldShowTeamIntro(Team $team): bool
-    {
-        return $team->hasIntroVideo();
-    }
-
-    public function dismissOpeningVideo(TalentShow $talentShow): TalentShow
-    {
-        if (! $talentShow->showing_opening_video) {
-            return $talentShow;
-        }
-
-        $talentShow->update(array_merge(
-            ['showing_opening_video' => false],
-            $this->waitingScreenFlags($talentShow),
-        ));
-
-        $this->auditLogService->log(
-            action: 'opening_video_dismissed',
-            entityType: 'talent_show',
-            entityId: $talentShow->id,
-        );
-
-        return $talentShow->fresh();
-    }
-
-    public function replayOpeningVideo(TalentShow $talentShow): TalentShow
-    {
-        if (! $talentShow->hasOpeningVideo()) {
-            throw new InvalidArgumentException('Δεν υπάρχει video έναρξης.');
-        }
-
-        $talentShow->update([
-            'showing_opening_video' => true,
-            'showing_closing_video' => false,
-            'showing_waiting_video' => false,
-            'showing_waiting_image' => false,
-            'showing_team_intro' => false,
-        ]);
-
-        $this->auditLogService->log(
-            action: 'opening_video_replayed',
-            entityType: 'talent_show',
-            entityId: $talentShow->id,
-        );
-
-        return $talentShow->fresh();
-    }
-
-    public function dismissClosingVideo(TalentShow $talentShow): TalentShow
-    {
-        if (! $talentShow->showing_closing_video) {
-            return $talentShow;
-        }
-
-        $talentShow->update(['showing_closing_video' => false]);
-
-        $this->auditLogService->log(
-            action: 'closing_video_dismissed',
-            entityType: 'talent_show',
-            entityId: $talentShow->id,
-        );
-
-        return $talentShow->fresh();
-    }
-
-    public function replayClosingVideo(TalentShow $talentShow): TalentShow
-    {
-        if (! $talentShow->hasClosingVideo()) {
-            throw new InvalidArgumentException('Δεν υπάρχει video λήξης.');
-        }
-
-        $talentShow->update([
-            'showing_closing_video' => true,
-            'showing_opening_video' => false,
-            'showing_waiting_video' => false,
-            'showing_waiting_image' => false,
-            'showing_team_intro' => false,
-        ]);
-
-        $this->auditLogService->log(
-            action: 'closing_video_replayed',
-            entityType: 'talent_show',
-            entityId: $talentShow->id,
-        );
-
-        return $talentShow->fresh();
-    }
-
-    public function dismissWaitingVideo(TalentShow $talentShow): TalentShow
-    {
-        if (! $talentShow->showing_waiting_video) {
-            return $talentShow;
-        }
-
-        $talentShow->update(['showing_waiting_video' => false]);
-
-        $this->auditLogService->log(
-            action: 'waiting_video_dismissed',
-            entityType: 'talent_show',
-            entityId: $talentShow->id,
-        );
-
-        return $talentShow->fresh();
-    }
-
-    public function replayWaitingVideo(TalentShow $talentShow): TalentShow
-    {
-        if (! $talentShow->hasWaitingVideo()) {
-            throw new InvalidArgumentException('Δεν υπάρχει video αναμονής.');
-        }
-
-        $talentShow->update([
-            'showing_waiting_video' => true,
-            'showing_waiting_image' => false,
-            'showing_opening_video' => false,
-            'showing_closing_video' => false,
-            'showing_team_intro' => false,
-        ]);
-
-        $this->auditLogService->log(
-            action: 'waiting_video_replayed',
-            entityType: 'talent_show',
-            entityId: $talentShow->id,
-        );
-
-        return $talentShow->fresh();
-    }
-
-    public function dismissWaitingImage(TalentShow $talentShow): TalentShow
-    {
-        if (! $talentShow->showing_waiting_image) {
-            return $talentShow;
-        }
-
-        $talentShow->update(['showing_waiting_image' => false]);
-
-        $this->auditLogService->log(
-            action: 'waiting_image_dismissed',
-            entityType: 'talent_show',
-            entityId: $talentShow->id,
-        );
-
-        return $talentShow->fresh();
-    }
-
-    public function showWaitingImage(TalentShow $talentShow): TalentShow
-    {
-        if (! $talentShow->hasWaitingImage()) {
-            throw new InvalidArgumentException('Δεν υπάρχει εικόνα αναμονής.');
-        }
-
-        $talentShow->update([
-            'showing_waiting_image' => true,
-            'showing_waiting_video' => false,
-            'showing_opening_video' => false,
-            'showing_closing_video' => false,
-            'showing_team_intro' => false,
-        ]);
-
-        $this->auditLogService->log(
-            action: 'waiting_image_shown',
-            entityType: 'talent_show',
-            entityId: $talentShow->id,
-        );
-
-        return $talentShow->fresh();
-    }
-
     public function canProceedToNext(TalentShow $talentShow): bool
     {
-        if ($talentShow->status !== TalentShowStatus::ScoringOpen || $talentShow->showing_team_intro) {
+        if ($talentShow->status !== TalentShowStatus::ScoringOpen) {
             return false;
         }
 
@@ -652,11 +434,7 @@ class TalentShowControlService
 
     public function canOpenScoring(TalentShow $talentShow): bool
     {
-        if (in_array($talentShow->status, [
-            TalentShowStatus::ScoringOpen,
-            TalentShowStatus::Archived,
-            TalentShowStatus::Completed,
-        ], true)) {
+        if (! in_array($talentShow->status, [TalentShowStatus::Draft, TalentShowStatus::Ready], true)) {
             return false;
         }
 
@@ -666,12 +444,34 @@ class TalentShowControlService
             return false;
         }
 
-        return in_array($talentShow->status, [TalentShowStatus::Draft, TalentShowStatus::Ready], true);
+        return true;
+    }
+
+    public function canRevealWinner(TalentShow $talentShow): bool
+    {
+        if ($talentShow->winner_revealed || $talentShow->hasPendingFinalVote()) {
+            return false;
+        }
+
+        if (! in_array($talentShow->status, [
+            TalentShowStatus::ScoringClosed,
+            TalentShowStatus::ResultsReady,
+            TalentShowStatus::WinnerRevealed,
+        ], true)) {
+            return false;
+        }
+
+        $ranking = array_filter(
+            $this->resultsService->getRanking($talentShow),
+            fn (array $item) => $item['is_complete']
+        );
+
+        return count($ranking) > 0;
     }
 
     public function canRevealScores(TalentShow $talentShow): bool
     {
-        if ($talentShow->status !== TalentShowStatus::ScoringOpen || $talentShow->showing_team_intro) {
+        if ($talentShow->status !== TalentShowStatus::ScoringOpen) {
             return false;
         }
 
@@ -698,7 +498,7 @@ class TalentShowControlService
 
     public function canShowRanking(TalentShow $talentShow): bool
     {
-        if ($talentShow->show_ranking) {
+        if ($talentShow->show_ranking || $talentShow->hasPendingFinalVote()) {
             return false;
         }
 
@@ -709,17 +509,12 @@ class TalentShowControlService
         ], true);
     }
 
-    public function canRevealWinner(TalentShow $talentShow): bool
+    public function canOpenFinalVote(TalentShow $talentShow): bool
     {
-        if ($talentShow->winner_revealed) {
-            return false;
-        }
-
-        return in_array($talentShow->status, [
-            TalentShowStatus::ScoringClosed,
-            TalentShowStatus::ResultsReady,
-            TalentShowStatus::WinnerRevealed,
-        ], true);
+        return $talentShow->status === TalentShowStatus::ScoringClosed
+            && $talentShow->finalVoter() !== null
+            && $talentShow->hasPendingFinalVote()
+            && ! $talentShow->final_vote_open;
     }
 
     public function canCompleteShow(TalentShow $talentShow): bool
@@ -733,26 +528,20 @@ class TalentShowControlService
 
     public function flowHint(TalentShow $talentShow): string
     {
-        if ($talentShow->showing_team_intro && $talentShow->currentTeam) {
-            return 'Παίζει intro της ομάδας «'.$talentShow->currentTeam->name.'» — περιμένετε ή πατήστε «Έναρξη παρουσίασης».';
-        }
-
-        if ($talentShow->showing_opening_video) {
-            return 'Παίζει intro εισαγωγής στην οθόνη — διαχείριση από «Videos στην οθόνη».';
-        }
-
         return match ($talentShow->status) {
-            TalentShowStatus::Draft, TalentShowStatus::Ready => $talentShow->current_team_id
-                ? 'Έτοιμο για βαθμολόγηση — πατήστε «Έναρξη βαθμολόγησης».'
-                : 'Πατήστε «Έναρξη Talent Show» (προαιρετικά video αναμονής από «Videos στην οθόνη»).',
+            TalentShowStatus::Draft, TalentShowStatus::Ready => 'Πατήστε «Έναρξη ψηφοφορίας».',
             TalentShowStatus::ScoringOpen => $talentShow->currentTeam
-                ? 'Οι κριτές ψηφίζουν την τρέχουσα ομάδα. Μετά «Επόμενος διαγωνιζόμενος».'
-                : 'Η βαθμολόγηση είναι ανοιχτή χωρίς ενεργή ομάδα.',
-            TalentShowStatus::ScoringClosed => 'Όλες οι ομάδες ολοκληρώθηκαν — «Εμφάνιση κατάταξης».',
-            TalentShowStatus::ResultsReady => $talentShow->winner_revealed
-                ? 'Πατήστε «Ολοκλήρωση Talent Show».'
-                : 'Πατήστε «Αποκάλυψη νικητή».',
-            TalentShowStatus::WinnerRevealed => 'Πατήστε «Ολοκλήρωση Talent Show».',
+                ? ($talentShow->show_live_scores
+                    ? 'Τα σκορ φαίνονται στο monitor. Όταν ψηφίσουν όλοι → «Επόμενη ομάδα».'
+                    : 'Οι κριτές ψηφίζουν. Όταν θέλετε → «Εμφάνιση σκορ στο monitor».')
+                : 'Η ψηφοφορία είναι ανοιχτή χωρίς ενεργή ομάδα.',
+            TalentShowStatus::ScoringClosed => $talentShow->hasPendingFinalVote()
+                ? ($talentShow->final_vote_open
+                    ? 'Αναμονή τελικής ψήφου από τον ειδικό κριτή.'
+                    : 'Ανοίξτε την τελική ψήφο όταν είστε έτοιμοι.')
+                : 'Η ψηφοφορία ολοκληρώθηκε. Μπορείτε να καθαρίσετε ή να ξεκινήσετε ξανά.',
+            TalentShowStatus::ResultsReady => 'Η διαδικασία ολοκληρώθηκε. Μπορείτε να καθαρίσετε ή να ξεκινήσετε ξανά.',
+            TalentShowStatus::WinnerRevealed => 'Ολοκληρώθηκε. Μπορείτε να καθαρίσετε ή να ξεκινήσετε ξανά.',
             TalentShowStatus::Completed => 'Η εκδήλωση ολοκληρώθηκε.',
             TalentShowStatus::Archived => 'Η εκδήλωση είναι αρχειοθετημένη.',
         };

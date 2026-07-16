@@ -14,7 +14,7 @@ class ScoreCalculationServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_maximum_score_equals_active_judges_times_ten(): void
+    public function test_maximum_score_equals_active_judges_times_twelve(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $show = TalentShow::create([
@@ -41,6 +41,6 @@ class ScoreCalculationServiceTest extends TestCase
         $result = $service->forTeam($team, $show);
 
         $this->assertEquals(5, $result['active_judges_count']);
-        $this->assertEquals(50, $result['maximum_score']);
+        $this->assertEquals(60, $result['maximum_score']);
     }
 }

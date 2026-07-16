@@ -5,6 +5,7 @@ namespace App\Livewire\Judge;
 use App\Enums\TalentShowStatus;
 use App\Models\Judge;
 use App\Models\TalentShow;
+use App\Models\Team;
 use App\Services\JudgeAccessService;
 use App\Services\ScoreCalculationService;
 use App\Services\VoteService;
@@ -17,9 +18,13 @@ class VotePanel extends Component
 {
     public ?int $selectedScore = null;
 
+    public ?int $selectedTeamId = null;
+
     public bool $showConfirm = false;
 
     public bool $hasVoted = false;
+
+    public bool $hasFinalVoted = false;
 
     public ?int $lastKnownTeamId = null;
 
@@ -72,11 +77,30 @@ class VotePanel extends Component
         $this->showConfirm = false;
     }
 
+    public function selectTeam(int $teamId): void
+    {
+        $this->selectedTeamId = $teamId;
+        $this->showConfirm = false;
+    }
+
     public function confirmSubmit(): void
     {
+        $judge = $this->getJudge();
+
+        if ($judge?->is_final_voter) {
+            if (! $this->selectedTeamId || ! $this->selectedScore) {
+                return;
+            }
+
+            $this->showConfirm = true;
+
+            return;
+        }
+
         if (! $this->selectedScore) {
             return;
         }
+
         $this->showConfirm = true;
     }
 
@@ -96,6 +120,12 @@ class VotePanel extends Component
             return;
         }
 
+        if ($judge->is_final_voter) {
+            session()->flash('error', 'Ο κριτής τελικής ψήφου ψηφίζει μόνο στο τέλος.');
+
+            return;
+        }
+
         if ($talentShow->status !== TalentShowStatus::ScoringOpen) {
             session()->flash('error', 'Η βαθμολόγηση δεν είναι ανοιχτή.');
 
@@ -111,9 +141,34 @@ class VotePanel extends Component
         }
     }
 
+    public function submitFinalVote(VoteService $voteService): void
+    {
+        if (! $this->selectedTeamId || ! $this->selectedScore) {
+            return;
+        }
+
+        $judge = $this->getJudge();
+        $team = Team::find($this->selectedTeamId);
+
+        if (! $judge || ! $team) {
+            session()->flash('error', 'Επιλέξτε ομάδα και βαθμό.');
+
+            return;
+        }
+
+        try {
+            $voteService->submitFinalVote($judge, $team, $this->selectedScore);
+            $this->hasFinalVoted = true;
+            $this->showConfirm = false;
+        } catch (InvalidArgumentException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
     public function render(ScoreCalculationService $scoreCalculationService, JudgeAccessService $judgeAccessService)
     {
         $judge = $judgeAccessService->keepAlive(request());
+        $allowedScores = app(VoteService::class)->allowedScores();
 
         if (! $judge) {
             return view('livewire.judge.vote-panel', [
@@ -123,6 +178,10 @@ class VotePanel extends Component
                 'voteProgress' => ['voted' => 0, 'total' => 0],
                 'sessionInvalid' => true,
                 'judgeScene' => 'reconnecting',
+                'allowedScores' => $allowedScores,
+                'finalTeams' => collect(),
+                'isFinalVoter' => false,
+                'finalVoteOpen' => false,
             ]);
         }
 
@@ -138,10 +197,39 @@ class VotePanel extends Component
                 'voteProgress' => ['voted' => 0, 'total' => 0],
                 'sessionInvalid' => false,
                 'judgeScene' => 'completed',
+                'allowedScores' => $allowedScores,
+                'finalTeams' => collect(),
+                'isFinalVoter' => $judge->is_final_voter,
+                'finalVoteOpen' => false,
             ]);
         }
 
         $this->showCompleted = false;
+        $isFinalVoter = (bool) $judge->is_final_voter;
+        $finalVoteOpen = (bool) ($talentShow?->final_vote_open);
+        $finalTeams = $isFinalVoter && $talentShow
+            ? $talentShow->activeTeams()->ordered()->get()
+            : collect();
+
+        if ($isFinalVoter && $judge->votes()->where('talent_show_id', $talentShow->id)->exists()) {
+            $this->hasFinalVoted = true;
+        }
+
+        if ($isFinalVoter) {
+            return view('livewire.judge.vote-panel', [
+                'judge' => $judge,
+                'talentShow' => $talentShow,
+                'currentTeam' => null,
+                'voteProgress' => ['voted' => 0, 'total' => 0],
+                'sessionInvalid' => false,
+                'judgeScene' => $this->finalJudgeSceneKey($finalVoteOpen),
+                'allowedScores' => $allowedScores,
+                'finalTeams' => $finalTeams,
+                'isFinalVoter' => true,
+                'finalVoteOpen' => $finalVoteOpen,
+            ]);
+        }
+
         $currentTeam = $talentShow?->currentTeam;
 
         $voteProgress = $talentShow && $currentTeam
@@ -178,7 +266,32 @@ class VotePanel extends Component
             'voteProgress' => $voteProgress,
             'sessionInvalid' => false,
             'judgeScene' => $this->judgeSceneKey($currentTeam),
+            'allowedScores' => $allowedScores,
+            'finalTeams' => collect(),
+            'isFinalVoter' => false,
+            'finalVoteOpen' => false,
         ]);
+    }
+
+    protected function finalJudgeSceneKey(bool $finalVoteOpen): string
+    {
+        if ($this->showCompleted) {
+            return 'completed';
+        }
+
+        if ($this->hasFinalVoted) {
+            return 'final-done';
+        }
+
+        if ($finalVoteOpen && $this->showConfirm) {
+            return 'final-confirm';
+        }
+
+        if ($finalVoteOpen) {
+            return 'final-voting';
+        }
+
+        return 'final-waiting';
     }
 
     protected function judgeSceneKey($currentTeam): string

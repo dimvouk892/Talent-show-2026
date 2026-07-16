@@ -18,7 +18,6 @@
 
 ```bash
 cp .env.example .env
-# Ορίστε ADMIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD
 
 ./vendor/bin/sail up -d
 ./vendor/bin/sail composer install
@@ -32,15 +31,15 @@ cp .env.example .env
 
 ## Admin credentials
 
-Ορίστε στο `.env`:
+Ορίζονται από τον `AdminUserSeeder` (όχι από `.env`):
 
-```env
-ADMIN_NAME="Admin"
-ADMIN_EMAIL="admin@talentshow.local"
-ADMIN_PASSWORD="your-secure-password"
+- Email: `admin@vsign.gr`
+- Όνομα: `vsign`
+- Κωδικός: `dimitris1234`
+
+```bash
+./vendor/bin/sail artisan db:seed --class=AdminUserSeeder
 ```
-
-Μετά: `./vendor/bin/sail artisan db:seed --class=AdminUserSeeder`
 
 ## Διευθύνσεις
 

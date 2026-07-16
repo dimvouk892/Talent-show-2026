@@ -37,7 +37,7 @@ class JudgeSessionPersistenceTest extends TalentShowTestCase
 
         $this->get($this->judgeVoteUrl($judge))->assertOk();
 
-        app(\App\Services\VoteService::class)->submit($judge, $this->show->currentTeam, 8);
+        app(\App\Services\VoteService::class)->submit($judge, $this->show->currentTeam, 10);
 
         $this->get($this->judgeVoteUrl($judge))
             ->assertOk()

@@ -17,7 +17,6 @@ class StoreTeamRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:50'],
             'description' => ['nullable', 'string'],
-            'photo' => ['nullable', 'image', 'max:5120'],
             'display_order' => ['integer', 'min:0'],
             'is_active' => ['boolean'],
         ];

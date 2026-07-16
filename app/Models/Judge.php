@@ -18,6 +18,7 @@ class Judge extends Model
         'token_generated_at',
         'token_expires_at',
         'is_active',
+        'is_final_voter',
         'last_access_at',
     ];
 
@@ -25,6 +26,7 @@ class Judge extends Model
     {
         return [
             'is_active' => 'boolean',
+            'is_final_voter' => 'boolean',
             'display_order' => 'integer',
             'access_token_encrypted' => 'encrypted',
             'token_generated_at' => 'datetime',

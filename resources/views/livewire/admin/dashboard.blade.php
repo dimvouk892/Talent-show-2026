@@ -55,7 +55,8 @@
                 <a href="{{ route('admin.talent-shows.judges', $data['show']) }}" class="btn-touch-sm bg-gray-100 text-center">Κριτές</a>
                 <a href="{{ route('admin.talent-shows.live-control', $data['show']) }}" class="btn-touch-sm bg-indigo-100 text-indigo-700 text-center sm:col-span-1 col-span-2">Ζωντανός έλεγχος</a>
                 <a href="{{ route('admin.talent-shows.results', $data['show']) }}" class="btn-touch-sm bg-gray-100 text-center">Αποτελέσματα</a>
-                <a href="{{ route('presentation.show', $data['show']) }}" target="_blank" rel="noopener" class="btn-touch-sm bg-gray-800 text-white text-center col-span-2 sm:col-span-1">Παρουσίαση ↗</a>
+                <a href="{{ route('presentation.show') }}" target="_blank" rel="noopener" class="btn-touch-sm bg-gray-800 text-white text-center">Monitor ↗</a>
+                <a href="{{ route('presentation.panel') }}" target="_blank" rel="noopener" class="btn-touch-sm bg-indigo-600 text-white text-center border border-indigo-500">Panel ↗</a>
             </div>
         </article>
     @empty

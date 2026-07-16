@@ -6,35 +6,45 @@ use App\Enums\TeamStatus;
 use App\Models\Judge;
 use App\Models\TalentShow;
 use App\Models\Team;
-use App\Models\Vote;
-use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 
 class ScoreCalculationService
 {
     public function forTeam(Team $team, ?TalentShow $talentShow = null): array
     {
         $talentShow ??= $team->talentShow;
-        $activeJudgeIds = $talentShow->activeJudges()->pluck('id');
-        $activeJudgesCount = $activeJudgeIds->count();
-        $votes = $team->votes()->whereIn('judge_id', $activeJudgeIds)->get();
+        $scoringJudgeIds = $talentShow->scoringJudges()->pluck('id');
+        $scoringJudgesCount = $scoringJudgeIds->count();
+        $votes = $team->votes()->whereIn('judge_id', $scoringJudgeIds)->get();
         $votesCount = $votes->count();
 
-        $totalScore = $votes->sum('score');
-        $averageScore = $votesCount > 0 ? round($totalScore / $votesCount, 2) : 0;
-        $maximumScore = $activeJudgesCount * 10;
-        $numberOfTens = $votes->where('score', 10)->count();
-        $numberOfNines = $votes->where('score', 9)->count();
+        $finalVoter = $talentShow->finalVoter();
+        $finalVote = $finalVoter
+            ? $team->votes()->where('judge_id', $finalVoter->id)->first()
+            : null;
+
+        $maxPerVote = (int) config('talent-show.max_score', 12);
+        $totalScore = $votes->sum('score') + (int) ($finalVote?->score ?? 0);
+        $scoredVotesCount = $votesCount + ($finalVote ? 1 : 0);
+        $averageScore = $scoredVotesCount > 0 ? round($totalScore / $scoredVotesCount, 2) : 0;
+        $maximumScore = ($scoringJudgesCount * $maxPerVote) + ($finalVoter ? $maxPerVote : 0);
+
+        $allScores = $votes->pluck('score');
+        if ($finalVote) {
+            $allScores->push($finalVote->score);
+        }
 
         return [
             'votes_count' => $votesCount,
-            'active_judges_count' => $activeJudgesCount,
+            'active_judges_count' => $scoringJudgesCount,
             'total_score' => $totalScore,
             'average_score' => $averageScore,
             'maximum_score' => $maximumScore,
-            'is_complete' => $votesCount >= $activeJudgesCount && $activeJudgesCount > 0,
-            'number_of_tens' => $numberOfTens,
-            'number_of_nines' => $numberOfNines,
+            'is_complete' => $votesCount >= $scoringJudgesCount && $scoringJudgesCount > 0,
+            'number_of_twelves' => $allScores->filter(fn ($score) => (int) $score === 12)->count(),
+            'number_of_tens' => $allScores->filter(fn ($score) => (int) $score === 10)->count(),
+            'number_of_nines' => $allScores->filter(fn ($score) => (int) $score === 9)->count(),
+            'has_final_vote' => $finalVote !== null,
+            'final_vote_score' => $finalVote?->score,
         ];
     }
 
@@ -46,7 +56,7 @@ class ScoreCalculationService
             return ['voted' => 0, 'total' => 0];
         }
 
-        $activeJudgeIds = $talentShow->activeJudges()->pluck('id');
+        $activeJudgeIds = $talentShow->scoringJudges()->pluck('id');
         $total = $activeJudgeIds->count();
         $voted = $team->votes()->whereIn('judge_id', $activeJudgeIds)->count();
 
@@ -55,7 +65,7 @@ class ScoreCalculationService
 
     public function judgeVoteStatus(TalentShow $talentShow, Team $team): array
     {
-        $judges = $talentShow->activeJudges()->get();
+        $judges = $talentShow->scoringJudges()->get();
         $votes = $team->votes()->get()->keyBy('judge_id');
 
         return $judges->map(function (Judge $judge) use ($votes) {
