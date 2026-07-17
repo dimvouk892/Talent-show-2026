@@ -76,7 +76,18 @@ abstract class TalentShowTestCase extends TestCase
     protected function loginJudge(Judge $judge): void
     {
         $token = $this->generateQrToken($judge);
-        $this->get(route('judge.access', ['judge' => $judge, 'token' => $token]));
+        $response = $this->get(route('judge.access', ['judge' => $judge, 'token' => $token]));
+        $this->persistJudgeCookieFromResponse($judge, $response);
+    }
+
+    protected function persistJudgeCookieFromResponse(Judge $judge, \Illuminate\Testing\TestResponse $response): void
+    {
+        $cookieName = app(JudgeAccessService::class)->judgeCookieName($judge->id);
+        $cookie = $response->getCookie($cookieName);
+
+        if ($cookie) {
+            $this->withCookie($cookieName, $cookie->getValue());
+        }
     }
 
     protected function judgeVoteUrl(Judge $judge): string

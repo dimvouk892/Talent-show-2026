@@ -2,18 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Enums\TalentShowStatus;
-use App\Models\AuditLog;
-use App\Models\Judge;
 use App\Models\JudgeSession;
-use App\Models\Team;
-use App\Models\Vote;
-use App\Models\VoteRevision;
 use App\Services\JudgeAccessService;
-use App\Services\ResultsService;
-use App\Services\ScoreCalculationService;
-use App\Services\TalentShowControlService;
-use App\Services\VoteService;
 use Tests\TalentShowTestCase;
 
 class JudgeAccessTest extends TalentShowTestCase
@@ -22,9 +12,13 @@ class JudgeAccessTest extends TalentShowTestCase
     {
         $judge = $this->show->judges()->first();
         $token = $this->generateQrToken($judge);
+        $cookieName = app(JudgeAccessService::class)->judgeCookieName($judge->id);
 
-        $this->get(route('judge.access', ['judge' => $judge, 'token' => $token]))
-            ->assertRedirect(route('judge.vote', $judge));
+        $response = $this->get(route('judge.access', ['judge' => $judge, 'token' => $token]))
+            ->assertRedirect(route('judge.vote', $judge))
+            ->assertCookie($cookieName);
+
+        $this->persistJudgeCookieFromResponse($judge, $response);
 
         $this->assertEquals($judge->id, session('judge_id'));
         $this->assertNotEmpty(session('judge_auth.'.$judge->id));
@@ -88,8 +82,9 @@ class JudgeAccessTest extends TalentShowTestCase
         $judge = $this->show->judges()->first();
         $token = $this->generateQrToken($judge);
 
-        $this->get(route('judge.access', ['judge' => $judge, 'token' => $token]))
+        $response = $this->get(route('judge.access', ['judge' => $judge, 'token' => $token]))
             ->assertRedirect(route('judge.vote', $judge));
+        $this->persistJudgeCookieFromResponse($judge, $response);
 
         $sessionId = session('judge_auth.'.$judge->id.'.session_id');
 
@@ -104,21 +99,58 @@ class JudgeAccessTest extends TalentShowTestCase
     {
         $judge1 = $this->show->judges()->first();
         $judge2 = $this->show->judges()->skip(1)->first();
+        $service = app(JudgeAccessService::class);
 
         $token1 = $this->generateQrToken($judge1);
         $token2 = $this->generateQrToken($judge2);
 
-        $this->get(route('judge.access', ['judge' => $judge1, 'token' => $token1]))
-            ->assertRedirect(route('judge.vote', $judge1));
+        $response1 = $this->get(route('judge.access', ['judge' => $judge1, 'token' => $token1]))
+            ->assertRedirect(route('judge.vote', $judge1))
+            ->assertCookie($service->judgeCookieName($judge1->id));
+        $this->persistJudgeCookieFromResponse($judge1, $response1);
 
-        $this->get(route('judge.access', ['judge' => $judge2, 'token' => $token2]))
-            ->assertRedirect(route('judge.vote', $judge2));
+        $response2 = $this->get(route('judge.access', ['judge' => $judge2, 'token' => $token2]))
+            ->assertRedirect(route('judge.vote', $judge2))
+            ->assertCookie($service->judgeCookieName($judge2->id));
+        $this->persistJudgeCookieFromResponse($judge2, $response2);
 
         $this->assertNotEmpty(session('judge_auth.'.$judge1->id));
         $this->assertNotEmpty(session('judge_auth.'.$judge2->id));
 
         $this->get(route('judge.vote', $judge1))->assertOk()->assertSee($judge1->name);
         $this->get(route('judge.vote', $judge2))->assertOk()->assertSee($judge2->name);
+    }
+
+    public function test_judge_cookie_keeps_auth_when_session_bag_is_lost(): void
+    {
+        $judge1 = $this->show->judges()->first();
+        $judge2 = $this->show->judges()->skip(1)->first();
+
+        $this->loginJudge($judge1);
+        $this->loginJudge($judge2);
+
+        // Simulate parallel-login race: only the last judge remains in the session bag.
+        session()->forget('judge_auth.'.$judge1->id);
+
+        $this->get(route('judge.vote', $judge1))->assertOk()->assertSee($judge1->name);
+        $this->get(route('judge.vote', $judge2))->assertOk()->assertSee($judge2->name);
+    }
+
+    public function test_all_judges_can_open_vote_panels_via_cookies(): void
+    {
+        $judges = $this->show->judges()->orderBy('display_order')->get();
+
+        foreach ($judges as $judge) {
+            $this->loginJudge($judge);
+        }
+
+        session()->forget('judge_auth');
+
+        foreach ($judges as $judge) {
+            $this->get(route('judge.vote', $judge))
+                ->assertOk()
+                ->assertSee($judge->name);
+        }
     }
 
     public function test_logging_out_one_judge_keeps_other_judge_session(): void
@@ -147,13 +179,15 @@ class JudgeAccessTest extends TalentShowTestCase
         $token1 = $this->generateQrToken($judge1);
         $token2 = $this->generateQrToken($judge2);
 
-        $this->get(route('judge.access', ['judge' => $judge1, 'token' => $token1]))
+        $response1 = $this->get(route('judge.access', ['judge' => $judge1, 'token' => $token1]))
             ->assertRedirect(route('judge.vote', $judge1));
+        $this->persistJudgeCookieFromResponse($judge1, $response1);
 
         $session1 = session('judge_auth.'.$judge1->id.'.session_id');
 
-        $this->get(route('judge.access', ['judge' => $judge2, 'token' => $token2]))
+        $response2 = $this->get(route('judge.access', ['judge' => $judge2, 'token' => $token2]))
             ->assertRedirect(route('judge.vote', $judge2));
+        $this->persistJudgeCookieFromResponse($judge2, $response2);
 
         $this->assertEquals($session1, session('judge_auth.'.$judge1->id.'.session_id'));
         $this->assertEquals($this->show->id, session('judge_auth.'.$judge1->id.'.talent_show_id'));

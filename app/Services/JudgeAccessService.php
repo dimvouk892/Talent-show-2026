@@ -7,6 +7,7 @@ use App\Models\JudgeSession;
 use App\Models\TalentShow;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -236,6 +237,8 @@ class JudgeAccessService
         }
 
         $this->extendSessionSliding($judgeSession, $talentShow);
+        $judgeSession->refresh();
+        $this->queueJudgeCookie($judgeId, (string) $auth['token'], $judgeSession->expires_at);
         $judge->update(['last_access_at' => now()]);
 
         return $judge;
@@ -344,6 +347,11 @@ class JudgeAccessService
             ->count('judge_id');
     }
 
+    public function judgeCookieName(int $judgeId): string
+    {
+        return 'ts_judge_'.$judgeId;
+    }
+
     protected function putJudgeAuth(Judge $judge, JudgeSession $session, string $plainToken): void
     {
         session()->put('judge_auth.'.$judge->id, [
@@ -361,10 +369,77 @@ class JudgeAccessService
             'authenticated_at' => now()->toIso8601String(),
             'judge_session_token' => $plainToken,
         ]);
+
+        // Per-judge cookie survives parallel QR opens (session bag races lose updates).
+        $this->queueJudgeCookie($judge->id, $plainToken, $session->expires_at);
+    }
+
+    protected function queueJudgeCookie(int $judgeId, string $plainToken, Carbon $expiresAt): void
+    {
+        $minutes = $expiresAt->isPast()
+            ? 1
+            : max(1, (int) ceil(now()->floatDiffInMinutes($expiresAt)));
+
+        Cookie::queue(cookie(
+            name: $this->judgeCookieName($judgeId),
+            value: $plainToken,
+            minutes: $minutes,
+            path: '/',
+            domain: config('session.domain'),
+            secure: (bool) config('session.secure', false),
+            httpOnly: true,
+            raw: false,
+            sameSite: config('session.same_site', 'lax'),
+        ));
+    }
+
+    protected function forgetJudgeCookie(int $judgeId): void
+    {
+        Cookie::queue(Cookie::forget($this->judgeCookieName($judgeId)));
+    }
+
+    protected function getJudgeAuthFromCookie(int $judgeId): ?array
+    {
+        $cookieToken = request()->cookie($this->judgeCookieName($judgeId));
+
+        if (! is_string($cookieToken) || $cookieToken === '') {
+            return null;
+        }
+
+        $session = JudgeSession::query()
+            ->where('judge_id', $judgeId)
+            ->whereNull('revoked_at')
+            ->where('session_token_hash', $this->hashToken($cookieToken))
+            ->where('expires_at', '>', now())
+            ->latest('id')
+            ->first();
+
+        if (! $session) {
+            return null;
+        }
+
+        $judge = Judge::find($judgeId);
+
+        return [
+            'session_id' => $session->id,
+            'token' => $cookieToken,
+            'talent_show_id' => $judge?->talent_show_id,
+            'authenticated_at' => $session->last_activity_at?->toIso8601String(),
+        ];
     }
 
     protected function getJudgeAuth(int $judgeId): ?array
     {
+        // Cookie is primary: independent Set-Cookie per judge, no lost-update races.
+        $fromCookie = $this->getJudgeAuthFromCookie($judgeId);
+        if ($fromCookie) {
+            if (! session('judge_auth.'.$judgeId)) {
+                session()->put('judge_auth.'.$judgeId, $fromCookie);
+            }
+
+            return $fromCookie;
+        }
+
         $auth = session('judge_auth.'.$judgeId);
 
         if (is_array($auth) && ! empty($auth['session_id']) && ! empty($auth['token'])) {
@@ -390,6 +465,7 @@ class JudgeAccessService
     protected function forgetJudgeAuth(int $judgeId): void
     {
         session()->forget('judge_auth.'.$judgeId);
+        $this->forgetJudgeCookie($judgeId);
 
         if ((int) session('judge_id') === $judgeId) {
             session()->forget([

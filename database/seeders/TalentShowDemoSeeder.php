@@ -49,34 +49,33 @@ class TalentShowDemoSeeder extends Seeder
             );
         }
 
-        $judgeNames = [
-            ['name' => 'Κριτής 1', 'title' => 'Μουσικός'],
-            ['name' => 'Κριτής 2', 'title' => 'Χορευτής'],
-            ['name' => 'Κριτής 3', 'title' => 'Σκηνοθέτης'],
-            ['name' => 'Κριτής 4', 'title' => 'Παραγωγός'],
-            ['name' => 'Κριτής 5', 'title' => 'Κριτικός'],
+        $judges = [
+            ['name' => 'Μάνος Κοκολάκης', 'title' => 'Τραγουδιστής', 'is_final_voter' => false],
+            ['name' => 'Γιώργος Στρατάκης', 'title' => 'Κρητικός τραγουδιστής', 'is_final_voter' => false],
+            ['name' => 'Χρήστος Στρατάκης', 'title' => 'Ηθοποιός', 'is_final_voter' => false],
+            ['name' => 'Αριστέα Καλογρίδη', 'title' => 'Παρουσιάστρια', 'is_final_voter' => false],
+            ['name' => 'Γεωργία Καρφή', 'title' => 'Προπονήτρια ενόργανης', 'is_final_voter' => false],
+            ['name' => 'Ήρω Γεωργακάκη', 'title' => 'Τραγουδίστρια', 'is_final_voter' => true],
         ];
 
-        foreach ($judgeNames as $index => $judge) {
+        $keepNames = [];
+
+        foreach ($judges as $index => $judge) {
             Judge::updateOrCreate(
                 ['talent_show_id' => $show->id, 'name' => $judge['name']],
                 [
                     'title' => $judge['title'],
                     'display_order' => $index + 1,
                     'is_active' => true,
-                    'is_final_voter' => false,
+                    'is_final_voter' => $judge['is_final_voter'],
                 ]
             );
+
+            $keepNames[] = $judge['name'];
         }
 
-        Judge::updateOrCreate(
-            ['talent_show_id' => $show->id, 'name' => 'Κριτής τελικής ψήφου'],
-            [
-                'title' => 'Ειδικός κριτής',
-                'display_order' => 6,
-                'is_active' => true,
-                'is_final_voter' => true,
-            ]
-        );
+        Judge::where('talent_show_id', $show->id)
+            ->whereNotIn('name', $keepNames)
+            ->delete();
     }
 }
