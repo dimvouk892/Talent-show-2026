@@ -167,11 +167,12 @@ class VotePanel extends Component
 
     public function render(ScoreCalculationService $scoreCalculationService, JudgeAccessService $judgeAccessService)
     {
-        $judge = $judgeAccessService->keepAlive(request());
+        // Always scope auth to this component's judge — Livewire polls have no route {judge}.
+        $judge = $judgeAccessService->keepAlive(request(), $this->judge);
         $allowedScores = app(VoteService::class)->allowedScores();
 
         if (! $judge) {
-            return view('livewire.judge.vote-panel', [
+            return $this->judgePanelView([
                 'judge' => null,
                 'talentShow' => null,
                 'currentTeam' => null,
@@ -190,7 +191,7 @@ class VotePanel extends Component
         if ($talentShow && $talentShow->status->isFinished()) {
             $this->showCompleted = true;
 
-            return view('livewire.judge.vote-panel', [
+            return $this->judgePanelView([
                 'judge' => $judge,
                 'talentShow' => $talentShow,
                 'currentTeam' => null,
@@ -216,7 +217,7 @@ class VotePanel extends Component
         }
 
         if ($isFinalVoter) {
-            return view('livewire.judge.vote-panel', [
+            return $this->judgePanelView([
                 'judge' => $judge,
                 'talentShow' => $talentShow,
                 'currentTeam' => null,
@@ -259,7 +260,7 @@ class VotePanel extends Component
             $this->hasVoted = false;
         }
 
-        return view('livewire.judge.vote-panel', [
+        return $this->judgePanelView([
             'judge' => $judge,
             'talentShow' => $talentShow,
             'currentTeam' => $currentTeam,
@@ -270,6 +271,19 @@ class VotePanel extends Component
             'finalTeams' => collect(),
             'isFinalVoter' => false,
             'finalVoteOpen' => false,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function judgePanelView(array $data)
+    {
+        $layoutJudge = $data['judge'] ?? $this->judge;
+
+        return view('livewire.judge.vote-panel', $data)->layoutData([
+            'layoutJudge' => $layoutJudge,
+            'layoutTalentShow' => $data['talentShow'] ?? $layoutJudge?->talentShow,
         ]);
     }
 

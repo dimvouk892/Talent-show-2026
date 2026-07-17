@@ -153,6 +153,28 @@ class JudgeAccessTest extends TalentShowTestCase
         }
     }
 
+    public function test_livewire_poll_keeps_each_judge_identity_after_later_login(): void
+    {
+        $judge1 = $this->show->judges()->first();
+        $judge2 = $this->show->judges()->skip(1)->first();
+
+        $this->loginJudge($judge1);
+        $this->loginJudge($judge2);
+
+        $this->assertEquals($judge2->id, session('judge_id'));
+
+        \Livewire\Livewire::test(\App\Livewire\Judge\VotePanel::class, ['judge' => $judge1])
+            ->assertSet('judge.id', $judge1->id)
+            ->assertViewHas('judge', fn ($judge) => $judge && (int) $judge->id === (int) $judge1->id)
+            ->call('keepAlive')
+            ->assertSet('judge.id', $judge1->id)
+            ->assertViewHas('judge', fn ($judge) => $judge && (int) $judge->id === (int) $judge1->id);
+
+        \Livewire\Livewire::test(\App\Livewire\Judge\VotePanel::class, ['judge' => $judge2])
+            ->assertSet('judge.id', $judge2->id)
+            ->assertViewHas('judge', fn ($judge) => $judge && (int) $judge->id === (int) $judge2->id);
+    }
+
     public function test_logging_out_one_judge_keeps_other_judge_session(): void
     {
         $judge1 = $this->show->judges()->first();
