@@ -1,6 +1,17 @@
 <div class="w-full max-w-2xl">
-    <h1 class="text-xl sm:text-2xl font-bold mb-5 sm:mb-6">Επεξεργασία Talent Show</h1>
-    <form wire:submit="save" class="card space-y-4">
+    @include('partials.admin-show-nav', ['talentShow' => $talentShow])
+
+    <h1 class="text-xl sm:text-2xl font-bold mb-5 sm:mb-6">Ρυθμίσεις Talent Show</h1>
+
+    @if ($flashSuccess)
+        <div class="mb-4 p-4 bg-green-100 text-green-800 rounded-xl text-sm" role="status">{{ $flashSuccess }}</div>
+    @endif
+    @if ($flashError)
+        <div class="mb-4 p-4 bg-red-100 text-red-800 rounded-xl text-sm" role="alert">{{ $flashError }}</div>
+    @endif
+
+    <form wire:submit="save" class="card space-y-4 mb-5">
+        <h2 class="text-lg font-bold">Βασικά στοιχεία</h2>
         <div>
             <label for="edit-title" class="block text-sm font-medium mb-1">Τίτλος *</label>
             <input id="edit-title" type="text" wire:model="title" class="input-touch" required>
@@ -28,4 +39,75 @@
             <a href="{{ route('admin.talent-shows.show', $talentShow) }}" class="w-full sm:w-auto btn-touch border border-gray-300 text-center">Ακύρωση</a>
         </div>
     </form>
+
+    <section class="card space-y-3" aria-label="Φόντο παρουσίασης">
+        <h2 class="text-lg font-bold">Φόντο monitor</h2>
+        <p class="text-sm text-gray-500">Εικόνα ή βίντεο ως φόντο στις οθόνες παρουσίασης (έως 512MB).</p>
+
+        @if ($talentShow->hasPresentationBackground())
+            <div class="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm space-y-2">
+                <p>Ενεργό: <strong>{{ $talentShow->presentation_bg_type === 'video' ? 'Βίντεο' : 'Εικόνα' }}</strong></p>
+                @if ($talentShow->presentation_bg_type === 'image')
+                    <img src="{{ $talentShow->presentationBackgroundUrl() }}" alt="" class="max-h-40 rounded-lg object-cover w-full">
+                @endif
+                <button type="button" wire:click="removePresentationBackground" class="w-full btn-touch border border-red-300 text-red-700 hover:bg-red-50">
+                    Αφαίρεση φόντου
+                </button>
+            </div>
+        @endif
+
+        <div>
+            <label for="presentation-bg" class="block text-sm font-medium mb-1">Ανέβασμα αρχείου</label>
+            <input id="presentation-bg"
+                   type="file"
+                   wire:model="presentationBackground"
+                   accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+                   class="input-touch">
+            @error('presentationBackground') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+            <div wire:loading wire:target="presentationBackground" class="text-sm text-indigo-700 mt-1">Μεταφόρτωση…</div>
+        </div>
+        <button type="button"
+                wire:click="savePresentationBackground"
+                wire:loading.attr="disabled"
+                class="w-full btn-touch bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-40">
+            Αποθήκευση φόντου
+        </button>
+    </section>
+
+    <section class="card mt-5 space-y-3" aria-label="Επανεκκίνηση / καθαρισμός">
+        <h2 class="text-lg font-bold text-red-800">Επανεκκίνηση / καθαρισμός</h2>
+        <p class="text-sm text-gray-500">Επικίνδυνες ενέργειες — διαγράφουν βαθμολογίες.</p>
+        <button type="button" wire:click="askClearScores" class="w-full btn-touch bg-red-600 text-white hover:bg-red-500">
+            Καθαρισμός σκορ
+        </button>
+        <button type="button" wire:click="confirmRestart" class="w-full btn-touch border border-red-300 text-red-700 hover:bg-red-50">
+            Διαγραφή &amp; ξανά έναρξη
+        </button>
+    </section>
+
+    @if ($showClearScoresConfirm)
+        <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="clear-scores-title">
+            <div class="modal-panel">
+                <h3 id="clear-scores-title" class="font-bold text-lg mb-3">Καθαρισμός βαθμολογιών;</h3>
+                <p class="text-sm text-gray-600 mb-5">Θα διαγραφούν όλες οι ψήφοι. Η ενέργεια δεν αναιρείται.</p>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button type="button" wire:click="confirmClearScores" class="w-full btn-touch bg-red-600 text-white">Ναι</button>
+                    <button type="button" wire:click="cancelDangerConfirm" class="w-full btn-touch border border-gray-300">Όχι</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($showRestartConfirm)
+        <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="restart-show-title">
+            <div class="modal-panel">
+                <h3 id="restart-show-title" class="font-bold text-lg mb-3">Ξανά έναρξη;</h3>
+                <p class="text-sm text-gray-600 mb-5">Διαγραφή βαθμολογιών και έναρξη από την 1η ομάδα.</p>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button type="button" wire:click="restartShow" class="w-full btn-touch bg-red-600 text-white">Ναι</button>
+                    <button type="button" wire:click="cancelDangerConfirm" class="w-full btn-touch border border-gray-300">Όχι</button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

@@ -23,9 +23,11 @@ class ScoreCalculationService
             : null;
 
         $maxPerVote = (int) config('talent-show.max_score', 12);
-        $totalScore = $votes->sum('score') + (int) ($finalVote?->score ?? 0);
-        $scoredVotesCount = $votesCount + ($finalVote ? 1 : 0);
-        $averageScore = $scoredVotesCount > 0 ? round($totalScore / $scoredVotesCount, 2) : 0;
+        $scoringTotal = (int) $votes->sum('score');
+        $finalScore = (int) ($finalVote?->score ?? 0);
+        $totalScore = $scoringTotal + $finalScore;
+        // Μ.Ο. μόνο από κριτές βαθμολόγησης — η τελική ψήφος μετρά στο σύνολο, όχι στον Μ.Ο.
+        $averageScore = $votesCount > 0 ? round($scoringTotal / $votesCount, 2) : 0;
         $maximumScore = ($scoringJudgesCount * $maxPerVote) + ($finalVoter ? $maxPerVote : 0);
 
         $allScores = $votes->pluck('score');

@@ -11,6 +11,7 @@ use App\Services\ScoreCalculationService;
 use App\Services\TalentShowControlService;
 use App\Services\VoteService;
 use App\Livewire\Admin\LiveControl;
+use App\Livewire\Admin\TalentShows\Edit;
 use InvalidArgumentException;
 use Livewire\Livewire;
 use Tests\TalentShowTestCase;
@@ -145,7 +146,7 @@ class TalentShowControlTest extends TalentShowTestCase
         $this->assertEquals(53, $result['total_score']);
     }
 
-    public function test_average_score_calculated_correctly(): void
+    public function test_total_score_is_sum_of_votes(): void
     {
         $this->openScoring();
         $team = $this->show->currentTeam;
@@ -155,7 +156,7 @@ class TalentShowControlTest extends TalentShowTestCase
         }
 
         $result = app(ScoreCalculationService::class)->forTeam($team->fresh());
-        $this->assertEquals(10.0, $result['average_score']);
+        $this->assertEquals(50, $result['total_score']);
     }
 
     public function test_maximum_score_is_correct(): void
@@ -220,6 +221,7 @@ class TalentShowControlTest extends TalentShowTestCase
         $this->assertFalse($this->show->show_live_scores);
         $this->assertFalse($this->show->show_ranking);
         $this->assertFalse($this->show->winner_revealed);
+        $this->assertEquals(0, $this->show->podium_reveal_step);
 
         $this->assertEquals(1, Team::where('talent_show_id', $this->show->id)
             ->where('status', TeamStatus::Active)
@@ -249,13 +251,13 @@ class TalentShowControlTest extends TalentShowTestCase
         );
     }
 
-    public function test_clear_scores_via_live_control_modal(): void
+    public function test_clear_scores_via_settings_modal(): void
     {
         $this->openScoring();
         app(VoteService::class)->submit($this->show->judges()->first(), $this->show->currentTeam, 10);
 
         Livewire::actingAs($this->admin)
-            ->test(LiveControl::class, ['talentShow' => $this->show])
+            ->test(Edit::class, ['talentShow' => $this->show])
             ->call('askClearScores')
             ->assertSet('showClearScoresConfirm', true)
             ->call('confirmClearScores')
@@ -313,13 +315,13 @@ class TalentShowControlTest extends TalentShowTestCase
             ->assertSee('Απαιτείται τουλάχιστον 1 ενεργός κριτής.');
     }
 
-    public function test_restart_via_live_control_modal(): void
+    public function test_restart_via_settings_modal(): void
     {
         $this->openScoring();
         $this->voteForCurrentTeam();
 
         Livewire::actingAs($this->admin)
-            ->test(LiveControl::class, ['talentShow' => $this->show])
+            ->test(Edit::class, ['talentShow' => $this->show])
             ->call('confirmRestart')
             ->assertSet('showRestartConfirm', true)
             ->call('restartShow')
@@ -343,5 +345,198 @@ class TalentShowControlTest extends TalentShowTestCase
 
         $this->assertEquals(0, Vote::where('talent_show_id', $this->show->id)->count());
         $this->assertEquals(TalentShowStatus::ScoringOpen, $this->show->fresh()->status);
+    }
+
+    protected function completeAllVotingWithDistinctScores(): void
+    {
+        $control = app(TalentShowControlService::class);
+        $control->openScoring($this->show);
+        $scores = [12, 10, 9];
+
+        foreach ($this->show->activeTeams()->ordered()->get() as $index => $team) {
+            $this->show->refresh();
+            $score = $scores[$index % count($scores)];
+            foreach ($this->show->judges as $judge) {
+                if ($judge->is_final_voter) {
+                    continue;
+                }
+                app(VoteService::class)->submit($judge, $this->show->currentTeam, $score);
+            }
+            $control->nextTeam($this->show->fresh());
+        }
+    }
+
+    public function test_podium_reveal_advances_from_last_to_first(): void
+    {
+        $this->completeAllVotingWithDistinctScores();
+        $control = app(TalentShowControlService::class);
+        $control->showRanking($this->show->fresh());
+
+        $this->assertTrue($control->canStartPodiumReveal($this->show->fresh()));
+        $this->assertFalse($control->canAdvancePodium($this->show->fresh()));
+
+        $control->startPodiumReveal($this->show->fresh());
+        $this->show->refresh();
+
+        $this->assertEquals(1, $this->show->podium_reveal_step);
+        $this->assertFalse($this->show->winner_revealed);
+
+        $state = app(\App\Services\ResultsService::class)->getPodiumRevealState($this->show);
+        $this->assertEquals(3, $state['total_steps']);
+        $this->assertEquals(3, $state['current']['ranking_position']);
+
+        $control->nextPodiumReveal($this->show->fresh());
+        $this->show->refresh();
+        $this->assertEquals(2, $this->show->podium_reveal_step);
+        $this->assertEquals(2, app(\App\Services\ResultsService::class)->getPodiumRevealState($this->show)['current']['ranking_position']);
+
+        $control->nextPodiumReveal($this->show->fresh());
+        $this->show->refresh();
+
+        $this->assertEquals(3, $this->show->podium_reveal_step);
+        $this->assertTrue($this->show->winner_revealed);
+        $this->assertEquals(TalentShowStatus::WinnerRevealed, $this->show->status);
+        $this->assertEquals(1, app(\App\Services\ResultsService::class)->getPodiumRevealState($this->show)['current']['ranking_position']);
+        $this->assertNotNull($this->show->winner_team_id);
+    }
+
+    public function test_cannot_start_podium_before_ranking(): void
+    {
+        $this->completeAllVotingWithDistinctScores();
+        $control = app(TalentShowControlService::class);
+
+        $this->assertFalse($control->canStartPodiumReveal($this->show->fresh()));
+
+        $this->expectException(InvalidArgumentException::class);
+        $control->startPodiumReveal($this->show->fresh());
+    }
+
+    public function test_cannot_start_podium_with_pending_final_vote(): void
+    {
+        $this->show->judges()->skip(4)->first()->update(['is_final_voter' => true]);
+        $this->completeAllVotingWithDistinctScores();
+
+        $control = app(TalentShowControlService::class);
+        $this->assertTrue($this->show->fresh()->hasPendingFinalVote());
+        $this->assertFalse($control->canStartPodiumReveal($this->show->fresh()));
+        $this->assertFalse($control->canShowRanking($this->show->fresh()));
+    }
+
+    public function test_podium_rewind_clears_winner_revealed(): void
+    {
+        $this->completeAllVotingWithDistinctScores();
+        $control = app(TalentShowControlService::class);
+        $control->showRanking($this->show->fresh());
+        $control->startPodiumReveal($this->show->fresh());
+        $control->nextPodiumReveal($this->show->fresh());
+        $control->nextPodiumReveal($this->show->fresh());
+
+        $this->show->refresh();
+        $this->assertTrue($this->show->winner_revealed);
+
+        $control->previousPodiumReveal($this->show->fresh());
+        $this->show->refresh();
+
+        $this->assertEquals(2, $this->show->podium_reveal_step);
+        $this->assertFalse($this->show->winner_revealed);
+    }
+
+    public function test_restart_clears_podium_reveal_step(): void
+    {
+        $this->completeAllVotingWithDistinctScores();
+        $control = app(TalentShowControlService::class);
+        $control->showRanking($this->show->fresh());
+        $control->startPodiumReveal($this->show->fresh());
+
+        $this->assertEquals(1, $this->show->fresh()->podium_reveal_step);
+
+        $control->restartShow($this->show->fresh());
+        $this->show->refresh();
+
+        $this->assertEquals(0, $this->show->podium_reveal_step);
+        $this->assertFalse($this->show->winner_revealed);
+    }
+
+    public function test_winner_monitor_shows_waiting_before_podium(): void
+    {
+        $this->completeAllVotingWithDistinctScores();
+        app(TalentShowControlService::class)->showRanking($this->show->fresh());
+
+        $this->get(route('presentation.show'))
+            ->assertOk()
+            ->assertSee('Αναμονή αποκάλυψης top 5');
+    }
+
+    public function test_final_overview_shows_all_teams_and_chart_after_podium(): void
+    {
+        $this->completeAllVotingWithDistinctScores();
+        $control = app(TalentShowControlService::class);
+        $control->showRanking($this->show->fresh());
+        $control->startPodiumReveal($this->show->fresh());
+        $control->nextPodiumReveal($this->show->fresh());
+        $control->nextPodiumReveal($this->show->fresh());
+
+        $this->assertTrue($control->canShowFinalOverview($this->show->fresh()));
+
+        $control->showFinalOverview($this->show->fresh());
+        $this->show->refresh();
+
+        $this->assertTrue($this->show->show_final_overview);
+
+        $this->get(route('presentation.show'))
+            ->assertOk()
+            ->assertSee('Τελική κατάταξη')
+            ->assertSee('Γράφημα αποτελεσμάτων')
+            ->assertSee('Team 1');
+
+        $control->hideFinalOverview($this->show->fresh());
+        $this->assertFalse($this->show->fresh()->show_final_overview);
+    }
+
+    public function test_cannot_show_final_overview_before_podium_complete(): void
+    {
+        $this->completeAllVotingWithDistinctScores();
+        $control = app(TalentShowControlService::class);
+        $control->showRanking($this->show->fresh());
+
+        $this->assertFalse($control->canShowFinalOverview($this->show->fresh()));
+
+        $this->expectException(InvalidArgumentException::class);
+        $control->showFinalOverview($this->show->fresh());
+    }
+
+    public function test_presentation_background_upload_and_remove(): void
+    {
+        $file = \Illuminate\Http\UploadedFile::fake()->image('bg.jpg', 800, 600);
+
+        $control = app(TalentShowControlService::class);
+        $control->storePresentationBackground($this->show->fresh(), $file);
+        $this->show->refresh();
+
+        $this->assertEquals('image', $this->show->presentation_bg_type);
+        $this->assertNotNull($this->show->presentation_bg_path);
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('public')->exists($this->show->presentation_bg_path));
+
+        $control->removePresentationBackground($this->show->fresh());
+        $this->show->refresh();
+
+        $this->assertNull($this->show->presentation_bg_path);
+        $this->assertNull($this->show->presentation_bg_type);
+    }
+
+    public function test_restart_clears_final_overview_flag(): void
+    {
+        $this->completeAllVotingWithDistinctScores();
+        $control = app(TalentShowControlService::class);
+        $control->showRanking($this->show->fresh());
+        $control->startPodiumReveal($this->show->fresh());
+        $control->nextPodiumReveal($this->show->fresh());
+        $control->nextPodiumReveal($this->show->fresh());
+        $control->showFinalOverview($this->show->fresh());
+
+        $this->assertTrue($this->show->fresh()->show_final_overview);
+
+        $control->restartShow($this->show->fresh());
+        $this->assertFalse($this->show->fresh()->show_final_overview);
     }
 }

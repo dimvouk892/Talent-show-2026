@@ -111,6 +111,38 @@ class ResultsService
         return count($candidates) > 1 ? $candidates : [];
     }
 
+    public function getTopPlaces(TalentShow $talentShow, int $limit = 5): array
+    {
+        $complete = array_values(array_filter(
+            $this->getRanking($talentShow),
+            fn (array $item) => $item['is_complete'] && $item['ranking_position'] !== null
+        ));
+
+        return array_slice($complete, 0, max(0, $limit));
+    }
+
+    public function getPodiumRevealState(TalentShow $talentShow, int $limit = 5): array
+    {
+        $topPlaces = $this->getTopPlaces($talentShow, $limit);
+        $totalSteps = count($topPlaces);
+        $step = max(0, min((int) $talentShow->podium_reveal_step, $totalSteps));
+        $revealOrder = array_reverse($topPlaces);
+        $revealed = array_slice($revealOrder, 0, $step);
+        $current = $step > 0 ? ($revealOrder[$step - 1] ?? null) : null;
+        $next = $step < $totalSteps ? ($revealOrder[$step] ?? null) : null;
+
+        return [
+            'top_places' => $topPlaces,
+            'reveal_order' => $revealOrder,
+            'revealed' => $revealed,
+            'current' => $current,
+            'next' => $next,
+            'total_steps' => $totalSteps,
+            'step' => $step,
+            'is_complete' => $totalSteps > 0 && $step >= $totalSteps,
+        ];
+    }
+
     public function getWinner(TalentShow $talentShow): ?array
     {
         if (! $talentShow->winner_revealed || ! $talentShow->winner_team_id) {

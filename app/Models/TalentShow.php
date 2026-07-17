@@ -23,6 +23,10 @@ class TalentShow extends Model
         'final_vote_submitted_at',
         'show_ranking',
         'winner_revealed',
+        'podium_reveal_step',
+        'show_final_overview',
+        'presentation_bg_path',
+        'presentation_bg_type',
         'created_by',
     ];
 
@@ -36,7 +40,23 @@ class TalentShow extends Model
             'final_vote_submitted_at' => 'datetime',
             'show_ranking' => 'boolean',
             'winner_revealed' => 'boolean',
+            'podium_reveal_step' => 'integer',
+            'show_final_overview' => 'boolean',
         ];
+    }
+
+    public function presentationBackgroundUrl(): ?string
+    {
+        if (! $this->presentation_bg_path) {
+            return null;
+        }
+
+        return asset('storage/'.$this->presentation_bg_path);
+    }
+
+    public function hasPresentationBackground(): bool
+    {
+        return filled($this->presentation_bg_path) && in_array($this->presentation_bg_type, ['image', 'video'], true);
     }
 
     public function teams(): HasMany

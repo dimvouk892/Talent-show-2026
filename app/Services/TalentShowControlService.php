@@ -9,7 +9,9 @@ use App\Models\Team;
 use App\Models\User;
 use App\Models\Vote;
 use App\Models\VoteRevision;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 
 class TalentShowControlService
@@ -295,10 +297,14 @@ class TalentShowControlService
             $winnerId = $candidates[0]['team']->id;
         }
 
+        $topPlaces = $this->resultsService->getTopPlaces($talentShow);
+        $totalSteps = count($topPlaces);
+
         $talentShow->update([
             'winner_team_id' => $winnerId,
             'winner_revealed' => true,
             'status' => TalentShowStatus::WinnerRevealed,
+            'podium_reveal_step' => max($totalSteps, (int) $talentShow->podium_reveal_step),
         ]);
 
         $this->auditLogService->log(
@@ -309,6 +315,223 @@ class TalentShowControlService
         );
 
         return $talentShow->fresh(['winnerTeam']);
+    }
+
+    public function startPodiumReveal(TalentShow $talentShow, ?int $teamId = null): TalentShow
+    {
+        if (! $this->canStartPodiumReveal($talentShow)) {
+            throw new InvalidArgumentException('Δεν μπορεί να ξεκινήσει η αποκάλυψη top 5.');
+        }
+
+        $topPlaces = $this->resultsService->getTopPlaces($talentShow);
+
+        if (empty($topPlaces)) {
+            throw new InvalidArgumentException('Δεν υπάρχουν ολοκληρωμένα αποτελέσματα.');
+        }
+
+        $winnerId = $teamId ?: $talentShow->winner_team_id;
+        $candidates = $this->resultsService->getWinnerCandidates($talentShow);
+
+        if (count($candidates) > 1 && ! $winnerId) {
+            throw new InvalidArgumentException('Υπάρχει ισοβαθμία. Επιλέξτε χειροκίνητα τον νικητή.');
+        }
+
+        if (! $winnerId) {
+            $winnerId = $candidates[0]['team']->id;
+        }
+
+        $talentShow->update([
+            'winner_team_id' => $winnerId,
+            'winner_revealed' => false,
+            'podium_reveal_step' => 1,
+            'status' => TalentShowStatus::ResultsReady,
+        ]);
+
+        $this->auditLogService->log(
+            action: 'podium_reveal_started',
+            entityType: 'talent_show',
+            entityId: $talentShow->id,
+            newValues: [
+                'podium_reveal_step' => 1,
+                'winner_team_id' => $winnerId,
+            ],
+        );
+
+        if (count($topPlaces) === 1) {
+            return $this->finalizePodiumWinner($talentShow->fresh());
+        }
+
+        return $talentShow->fresh(['winnerTeam']);
+    }
+
+    public function nextPodiumReveal(TalentShow $talentShow): TalentShow
+    {
+        if (! $this->canAdvancePodium($talentShow)) {
+            throw new InvalidArgumentException('Δεν υπάρχει επόμενο βήμα αποκάλυψης.');
+        }
+
+        $state = $this->resultsService->getPodiumRevealState($talentShow);
+        $nextStep = $state['step'] + 1;
+
+        $talentShow->update(['podium_reveal_step' => $nextStep]);
+
+        $this->auditLogService->log(
+            action: 'podium_reveal_advanced',
+            entityType: 'talent_show',
+            entityId: $talentShow->id,
+            newValues: ['podium_reveal_step' => $nextStep],
+        );
+
+        $talentShow = $talentShow->fresh();
+
+        if ($nextStep >= $state['total_steps']) {
+            return $this->finalizePodiumWinner($talentShow);
+        }
+
+        return $talentShow;
+    }
+
+    public function previousPodiumReveal(TalentShow $talentShow): TalentShow
+    {
+        if (! $this->canRewindPodium($talentShow)) {
+            throw new InvalidArgumentException('Δεν υπάρχει προηγούμενο βήμα αποκάλυψης.');
+        }
+
+        $nextStep = max(0, (int) $talentShow->podium_reveal_step - 1);
+
+        $talentShow->update([
+            'podium_reveal_step' => $nextStep,
+            'winner_revealed' => false,
+            'status' => $nextStep > 0
+                ? TalentShowStatus::ResultsReady
+                : ($talentShow->show_ranking ? TalentShowStatus::ResultsReady : $talentShow->status),
+        ]);
+
+        $this->auditLogService->log(
+            action: 'podium_reveal_rewound',
+            entityType: 'talent_show',
+            entityId: $talentShow->id,
+            newValues: ['podium_reveal_step' => $nextStep],
+        );
+
+        return $talentShow->fresh();
+    }
+
+    protected function finalizePodiumWinner(TalentShow $talentShow): TalentShow
+    {
+        $winnerId = $talentShow->winner_team_id;
+
+        if (! $winnerId) {
+            $candidates = $this->resultsService->getWinnerCandidates($talentShow);
+
+            if (empty($candidates)) {
+                throw new InvalidArgumentException('Δεν υπάρχουν αποτελέσματα.');
+            }
+
+            if (count($candidates) > 1) {
+                throw new InvalidArgumentException('Υπάρχει ισοβαθμία. Επιλέξτε χειροκίνητα τον νικητή.');
+            }
+
+            $winnerId = $candidates[0]['team']->id;
+        }
+
+        $topPlaces = $this->resultsService->getTopPlaces($talentShow);
+
+        $talentShow->update([
+            'winner_team_id' => $winnerId,
+            'winner_revealed' => true,
+            'status' => TalentShowStatus::WinnerRevealed,
+            'podium_reveal_step' => count($topPlaces),
+        ]);
+
+        $this->auditLogService->log(
+            action: 'winner_revealed',
+            entityType: 'talent_show',
+            entityId: $talentShow->id,
+            newValues: ['winner_team_id' => $winnerId, 'via' => 'podium'],
+        );
+
+        return $talentShow->fresh(['winnerTeam']);
+    }
+
+    public function showFinalOverview(TalentShow $talentShow): TalentShow
+    {
+        if (! $this->canShowFinalOverview($talentShow)) {
+            throw new InvalidArgumentException('Η πλήρης κατάταξη εμφανίζεται μετά την ολοκλήρωση της τελετής top 5.');
+        }
+
+        $talentShow->update(['show_final_overview' => true]);
+
+        $this->auditLogService->log(
+            action: 'final_overview_shown',
+            entityType: 'talent_show',
+            entityId: $talentShow->id,
+        );
+
+        return $talentShow->fresh();
+    }
+
+    public function hideFinalOverview(TalentShow $talentShow): TalentShow
+    {
+        $talentShow->update(['show_final_overview' => false]);
+
+        $this->auditLogService->log(
+            action: 'final_overview_hidden',
+            entityType: 'talent_show',
+            entityId: $talentShow->id,
+        );
+
+        return $talentShow->fresh();
+    }
+
+    public function storePresentationBackground(TalentShow $talentShow, UploadedFile $file): TalentShow
+    {
+        $mime = (string) $file->getMimeType();
+        $type = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : null);
+
+        if (! $type) {
+            throw new InvalidArgumentException('Επιτρέπονται μόνο εικόνες ή βίντεο.');
+        }
+
+        if ($talentShow->presentation_bg_path) {
+            Storage::disk('public')->delete($talentShow->presentation_bg_path);
+        }
+
+        $path = $file->store('talent-shows/'.$talentShow->id.'/background', 'public');
+
+        $talentShow->update([
+            'presentation_bg_path' => $path,
+            'presentation_bg_type' => $type,
+        ]);
+
+        $this->auditLogService->log(
+            action: 'presentation_background_updated',
+            entityType: 'talent_show',
+            entityId: $talentShow->id,
+            newValues: ['type' => $type, 'path' => $path],
+        );
+
+        return $talentShow->fresh();
+    }
+
+    public function removePresentationBackground(TalentShow $talentShow): TalentShow
+    {
+        if ($talentShow->presentation_bg_path) {
+            Storage::disk('public')->delete($talentShow->presentation_bg_path);
+        }
+
+        $talentShow->update([
+            'presentation_bg_path' => null,
+            'presentation_bg_type' => null,
+        ]);
+
+        $this->auditLogService->log(
+            action: 'presentation_background_removed',
+            entityType: 'talent_show',
+            entityId: $talentShow->id,
+        );
+
+        return $talentShow->fresh();
     }
 
     public function completeShow(TalentShow $talentShow): TalentShow
@@ -392,6 +615,8 @@ class TalentShowControlService
                 'final_vote_submitted_at' => null,
                 'show_ranking' => false,
                 'winner_revealed' => false,
+                'podium_reveal_step' => 0,
+                'show_final_overview' => false,
             ]);
 
             $this->auditLogService->log(
@@ -469,6 +694,58 @@ class TalentShowControlService
         return count($ranking) > 0;
     }
 
+    public function canStartPodiumReveal(TalentShow $talentShow): bool
+    {
+        if ($talentShow->podium_reveal_step > 0 || $talentShow->winner_revealed || $talentShow->hasPendingFinalVote()) {
+            return false;
+        }
+
+        if (! $talentShow->show_ranking) {
+            return false;
+        }
+
+        if (! in_array($talentShow->status, [
+            TalentShowStatus::ScoringClosed,
+            TalentShowStatus::ResultsReady,
+        ], true)) {
+            return false;
+        }
+
+        return count($this->resultsService->getTopPlaces($talentShow)) > 0;
+    }
+
+    public function canAdvancePodium(TalentShow $talentShow): bool
+    {
+        if ($talentShow->hasPendingFinalVote()) {
+            return false;
+        }
+
+        $state = $this->resultsService->getPodiumRevealState($talentShow);
+
+        return $state['step'] > 0 && $state['step'] < $state['total_steps'];
+    }
+
+    public function canRewindPodium(TalentShow $talentShow): bool
+    {
+        return (int) $talentShow->podium_reveal_step > 0;
+    }
+
+    public function canShowFinalOverview(TalentShow $talentShow): bool
+    {
+        if ($talentShow->show_final_overview || $talentShow->hasPendingFinalVote()) {
+            return false;
+        }
+
+        $podium = $this->resultsService->getPodiumRevealState($talentShow);
+
+        return $talentShow->winner_revealed || $podium['is_complete'];
+    }
+
+    public function canHideFinalOverview(TalentShow $talentShow): bool
+    {
+        return (bool) $talentShow->show_final_overview;
+    }
+
     public function canRevealScores(TalentShow $talentShow): bool
     {
         if ($talentShow->status !== TalentShowStatus::ScoringOpen) {
@@ -528,6 +805,15 @@ class TalentShowControlService
 
     public function flowHint(TalentShow $talentShow): string
     {
+        $podium = $this->resultsService->getPodiumRevealState($talentShow);
+
+        if ($podium['step'] > 0 && ! $podium['is_complete']) {
+            $next = $podium['next'];
+            $place = $next ? $next['ranking_position'].'η' : 'επόμενη';
+
+            return "Τελετή top 5 σε εξέλιξη. Επόμενο: {$place} θέση.";
+        }
+
         return match ($talentShow->status) {
             TalentShowStatus::Draft, TalentShowStatus::Ready => 'Πατήστε «Έναρξη ψηφοφορίας».',
             TalentShowStatus::ScoringOpen => $talentShow->currentTeam
@@ -539,9 +825,15 @@ class TalentShowControlService
                 ? ($talentShow->final_vote_open
                     ? 'Αναμονή τελικής ψήφου από τον ειδικό κριτή.'
                     : 'Ανοίξτε την τελική ψήφο όταν είστε έτοιμοι.')
-                : 'Η ψηφοφορία ολοκληρώθηκε. Μπορείτε να καθαρίσετε ή να ξεκινήσετε ξανά.',
-            TalentShowStatus::ResultsReady => 'Η διαδικασία ολοκληρώθηκε. Μπορείτε να καθαρίσετε ή να ξεκινήσετε ξανά.',
-            TalentShowStatus::WinnerRevealed => 'Ολοκληρώθηκε. Μπορείτε να καθαρίσετε ή να ξεκινήσετε ξανά.',
+                : ($talentShow->show_ranking
+                    ? 'Εμφανίστε την τελετή top 5 στο monitor νικητών.'
+                    : 'Εμφανίστε την κατάταξη και μετά την τελετή top 5.'),
+            TalentShowStatus::ResultsReady => $talentShow->podium_reveal_step > 0
+                ? 'Η τελετή top 5 ολοκληρώθηκε ή συνεχίστε τα βήματα.'
+                : 'Ξεκινήστε την αποκάλυψη top 5 (5η → 1η θέση).',
+            TalentShowStatus::WinnerRevealed => $talentShow->show_final_overview
+                ? 'Εμφανίζεται η πλήρης κατάταξη και το γράφημα. Μπορείτε να καθαρίσετε ή να ξεκινήσετε ξανά.'
+                : 'Ο νικητής αποκαλύφθηκε. Προαιρετικά εμφανίστε όλες τις ομάδες + γράφημα.',
             TalentShowStatus::Completed => 'Η εκδήλωση ολοκληρώθηκε.',
             TalentShowStatus::Archived => 'Η εκδήλωση είναι αρχειοθετημένη.',
         };

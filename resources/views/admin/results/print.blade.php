@@ -199,8 +199,7 @@
         @if ($winner && $talentShow->winner_revealed)
             <div class="winner">
                 <strong>Νικήτρια ομάδα:</strong> {{ $winner['team']->name }}
-                — {{ $winner['total_score'] }}/{{ $winner['maximum_score'] }}
-                (Μ.Ο. {{ number_format($winner['average_score'], 2, ',', '') }})
+                — {{ $winner['total_score'] }}
             </div>
         @endif
 
@@ -218,7 +217,6 @@
                     @endif
                     <col class="col-final-score">
                     <col class="col-total">
-                    <col class="col-avg">
                 </colgroup>
                 <thead>
                     <tr>
@@ -232,7 +230,6 @@
                         @endif
                         <th class="final-total">Τελική βαθμολογία</th>
                         <th>Σύνολο</th>
-                        <th>Μ.Ο.</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -281,14 +278,7 @@
                             </td>
                             <td>
                                 @if ($hasAnyVote)
-                                    {{ $item['total_score'] }}/{{ $item['maximum_score'] }}
-                                @else
-                                    —
-                                @endif
-                            </td>
-                            <td>
-                                @if ($hasAnyVote)
-                                    {{ number_format($item['average_score'], 2, ',', '') }}
+                                    {{ $item['total_score'] }}
                                 @else
                                     —
                                 @endif

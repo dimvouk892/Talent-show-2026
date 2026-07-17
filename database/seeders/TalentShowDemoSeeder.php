@@ -64,8 +64,19 @@ class TalentShowDemoSeeder extends Seeder
                     'title' => $judge['title'],
                     'display_order' => $index + 1,
                     'is_active' => true,
+                    'is_final_voter' => false,
                 ]
             );
         }
+
+        Judge::updateOrCreate(
+            ['talent_show_id' => $show->id, 'name' => 'Κριτής τελικής ψήφου'],
+            [
+                'title' => 'Ειδικός κριτής',
+                'display_order' => 6,
+                'is_active' => true,
+                'is_final_voter' => true,
+            ]
+        );
     }
 }

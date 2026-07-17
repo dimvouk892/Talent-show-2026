@@ -46,14 +46,6 @@ class LiveControl extends Component
 
     public bool $showWinnerSelect = false;
 
-    public bool $showRestartConfirm = false;
-
-    public bool $showArchiveConfirm = false;
-
-    public bool $showRevokeAllConfirm = false;
-
-    public bool $showClearScoresConfirm = false;
-
     public ?string $flashSuccess = null;
 
     public ?string $flashError = null;
@@ -196,6 +188,67 @@ class LiveControl extends Component
         }
     }
 
+    public function startPodiumReveal(TalentShowControlService $control, ResultsService $results): void
+    {
+        try {
+            $talentShow = $this->getTalentShow();
+            $tied = $results->getTiedTeams($talentShow);
+
+            if (! empty($tied) && ! $this->selectedWinnerId && ! $talentShow->winner_team_id) {
+                $this->showWinnerSelect = true;
+
+                return;
+            }
+
+            $control->startPodiumReveal($talentShow, $this->selectedWinnerId);
+            $this->showWinnerSelect = false;
+            $this->notifySuccess('Ξεκίνησε η αποκάλυψη top 5.');
+        } catch (InvalidArgumentException $e) {
+            $this->notifyError($e->getMessage());
+        }
+    }
+
+    public function nextPodiumReveal(TalentShowControlService $control): void
+    {
+        try {
+            $control->nextPodiumReveal($this->getTalentShow());
+            $talentShow = $this->getTalentShow();
+            $this->notifySuccess(
+                $talentShow->winner_revealed
+                    ? 'Αποκαλύφθηκε η 1η θέση.'
+                    : 'Επόμενη θέση αποκαλύφθηκε.'
+            );
+        } catch (InvalidArgumentException $e) {
+            $this->notifyError($e->getMessage());
+        }
+    }
+
+    public function previousPodiumReveal(TalentShowControlService $control): void
+    {
+        try {
+            $control->previousPodiumReveal($this->getTalentShow());
+            $this->notifySuccess('Επιστροφή στο προηγούμενο βήμα.');
+        } catch (InvalidArgumentException $e) {
+            $this->notifyError($e->getMessage());
+        }
+    }
+
+    public function showFinalOverview(TalentShowControlService $control): void
+    {
+        try {
+            $control->showFinalOverview($this->getTalentShow());
+            $this->notifySuccess('Εμφανίστηκαν όλες οι ομάδες και το γράφημα.');
+        } catch (InvalidArgumentException $e) {
+            $this->notifyError($e->getMessage());
+        }
+    }
+
+    public function hideFinalOverview(TalentShowControlService $control): void
+    {
+        $control->hideFinalOverview($this->getTalentShow());
+        $this->notifySuccess('Αποκρύφθηκε η πλήρης κατάταξη.');
+    }
+
     public function completeShow(TalentShowControlService $control): void
     {
         $control->completeShow($this->getTalentShow());
@@ -213,71 +266,6 @@ class LiveControl extends Component
     {
         $count = $judgeAccessService->revokeAllSessionsForTalentShow($this->getTalentShow());
         $this->notifySuccess("Αποσυνδέθηκαν όλοι οι κριτές ({$count} sessions).");
-    }
-
-    public function confirmRestart(): void
-    {
-        $this->showRestartConfirm = true;
-    }
-
-    public function cancelDangerConfirm(): void
-    {
-        $this->showRestartConfirm = false;
-        $this->showArchiveConfirm = false;
-        $this->showRevokeAllConfirm = false;
-        $this->showClearScoresConfirm = false;
-    }
-
-    public function askClearScores(): void
-    {
-        $this->cancelDangerConfirm();
-        $this->showClearScoresConfirm = true;
-    }
-
-    public function confirmClearScores(TalentShowControlService $control): void
-    {
-        try {
-            $control->clearScores($this->getTalentShow());
-            $this->showClearScoresConfirm = false;
-            $this->showNextConfirm = false;
-            $this->showWinnerSelect = false;
-            $this->notifySuccess('Οι βαθμολογίες διαγράφηκαν. Η εκδήλωση επανήλθε σε κατάσταση «Έτοιμο».');
-        } catch (InvalidArgumentException $e) {
-            $this->notifyError($e->getMessage());
-            $this->showClearScoresConfirm = false;
-        }
-    }
-
-    public function askArchive(): void
-    {
-        $this->cancelDangerConfirm();
-        $this->showArchiveConfirm = true;
-    }
-
-    public function askRevokeAllSessions(): void
-    {
-        $this->cancelDangerConfirm();
-        $this->showRevokeAllConfirm = true;
-    }
-
-    public function confirmRevokeAllJudgeSessions(JudgeAccessService $judgeAccessService): void
-    {
-        $this->revokeAllJudgeSessions($judgeAccessService);
-        $this->showRevokeAllConfirm = false;
-    }
-
-    public function restartShow(TalentShowControlService $control): void
-    {
-        try {
-            $control->restartShow($this->getTalentShow());
-            $this->showRestartConfirm = false;
-            $this->showNextConfirm = false;
-            $this->showWinnerSelect = false;
-            $this->notifySuccess('Η εκδήλωση επανεκκινήθηκε και άνοιξε η βαθμολόγηση από την 1η ομάδα.');
-        } catch (InvalidArgumentException $e) {
-            $this->notifyError($e->getMessage());
-            $this->showRestartConfirm = false;
-        }
     }
 
     public function openCorrection(int $voteId): void
@@ -434,10 +422,12 @@ class LiveControl extends Component
             : [];
         $canProceed = $control->canProceedToNext($talentShow);
         $tiedTeams = $resultsService->getTiedTeams($talentShow);
+        $podium = $resultsService->getPodiumRevealState($talentShow);
         $finalVoter = $talentShow->finalVoter();
         $finalVote = $finalVoter
             ? $finalVoter->votes()->where('talent_show_id', $talentShow->id)->with('team')->first()
             : null;
+        $panelReport = $resultsService->getDetailedReport($talentShow);
 
         return view('livewire.admin.live-control', [
             'talentShow' => $talentShow,
@@ -446,6 +436,7 @@ class LiveControl extends Component
             'judgeStatus' => $judgeStatus,
             'canProceed' => $canProceed,
             'tiedTeams' => $tiedTeams,
+            'podium' => $podium,
             'flowHint' => $control->flowHint($talentShow),
             'canStartShow' => $control->canStartShow($talentShow),
             'canOpenScoring' => $control->canOpenScoring($talentShow),
@@ -459,7 +450,14 @@ class LiveControl extends Component
             'finalVote' => $finalVote,
             'teams' => $talentShow->activeTeams()->ordered()->get(),
             'canRevealWinner' => $control->canRevealWinner($talentShow),
+            'canStartPodiumReveal' => $control->canStartPodiumReveal($talentShow),
+            'canAdvancePodium' => $control->canAdvancePodium($talentShow),
+            'canRewindPodium' => $control->canRewindPodium($talentShow),
+            'canShowFinalOverview' => $control->canShowFinalOverview($talentShow),
+            'canHideFinalOverview' => $control->canHideFinalOverview($talentShow),
             'canCompleteShow' => $control->canCompleteShow($talentShow),
+            'panelJudges' => $panelReport['judges'],
+            'panelRanking' => $panelReport['ranking'],
         ]);
     }
 }

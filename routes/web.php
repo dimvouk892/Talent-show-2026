@@ -19,7 +19,6 @@ use App\Livewire\Judge\VotePanel;
 use App\Livewire\Presentation\PanelScreen;
 use App\Livewire\Presentation\RankingScreen;
 use App\Livewire\Presentation\ShowScreen;
-use App\Livewire\Presentation\WinnerScreen;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -50,11 +49,11 @@ Route::middleware(['judge.auth'])->group(function () {
 Route::get('/monitor', ShowScreen::class)->name('presentation.show');
 Route::get('/monitor/panel', PanelScreen::class)->name('presentation.panel');
 Route::get('/monitor/ranking', RankingScreen::class)->name('presentation.ranking');
-Route::get('/monitor/winner', WinnerScreen::class)->name('presentation.winner');
+Route::redirect('/monitor/winner', '/monitor')->name('presentation.winner');
 
 Route::redirect('/presentation/{talentShow}', '/monitor');
 Route::redirect('/presentation/{talentShow}/ranking', '/monitor/ranking');
-Route::redirect('/presentation/{talentShow}/winner', '/monitor/winner');
+Route::redirect('/presentation/{talentShow}/winner', '/monitor');
 Route::redirect('/panel', '/monitor/panel');
 
 Route::prefix('admin')->group(function () {

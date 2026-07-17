@@ -58,7 +58,7 @@
     @if ($winner && $talentShow->winner_revealed)
         <div class="card mb-6 bg-yellow-50 border-yellow-200">
             <h2 class="text-lg sm:text-xl font-bold text-yellow-800">Νικήτρια ομάδα: {{ $winner['team']->name }}</h2>
-            <p class="mt-1">{{ $winner['total_score'] }} / {{ $winner['maximum_score'] }} — Μ.Ο. {{ number_format($winner['average_score'], 2, ',', '') }}</p>
+            <p class="mt-1">{{ $winner['total_score'] }}</p>
         </div>
     @endif
 
@@ -129,7 +129,6 @@
                                 </th>
                             @endforeach
                             <th class="p-3 text-center font-semibold border-b border-gray-200 bg-indigo-50 text-indigo-900 min-w-[88px]">Σύνολο</th>
-                            <th class="p-3 text-center font-semibold border-b border-gray-200 min-w-[64px]">Μ.Ο.</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -168,16 +167,9 @@
                                 @endforeach
                                 <td class="p-3 text-center font-bold bg-indigo-50/60 tabular-nums">
                                     @if ($item['votes_count'] > 0 || collect($item['judge_scores'])->contains('has_voted', true))
-                                        {{ $item['total_score'] }}<span class="text-gray-400 font-normal text-xs">/{{ $item['maximum_score'] }}</span>
+                                        {{ $item['total_score'] }}
                                     @else
                                         <span class="text-gray-300 font-normal">—</span>
-                                    @endif
-                                </td>
-                                <td class="p-3 text-center tabular-nums text-gray-700">
-                                    @if ($item['votes_count'] > 0 || collect($item['judge_scores'])->contains('has_voted', true))
-                                        {{ number_format($item['average_score'], 2, ',', '') }}
-                                    @else
-                                        <span class="text-gray-300">—</span>
                                     @endif
                                 </td>
                             </tr>

@@ -1,5 +1,8 @@
-<div wire:poll.2s class="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 w-full max-w-6xl mx-auto overflow-x-hidden">
-    <p class="text-base sm:text-xl md:text-2xl text-gray-400 mb-2 sm:mb-4 text-center break-words w-full">{{ $talentShow->title }}</p>
+<div wire:poll.2s class="relative min-h-screen w-full max-w-6xl mx-auto overflow-x-hidden">
+    @include('livewire.presentation.partials.presentation-background', ['talentShow' => $talentShow])
+
+    <div class="relative z-10 flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 min-h-screen bg-black/30">
+    <p class="text-base sm:text-xl md:text-2xl text-gray-300 mb-2 sm:mb-4 text-center break-words w-full">{{ $talentShow->title }}</p>
 
     <div wire:key="presentation-scene-{{ $presentationScene }}"
          x-data
@@ -12,33 +15,22 @@
              }, { once: true });
          })"
          class="relative flex flex-col items-center justify-center w-full">
-    @if ($winner && $talentShow->winner_revealed)
-        <div class="text-center relative w-full px-2" x-data x-init="
-            for (let i = 0; i < 50; i++) {
-                let el = document.createElement('div');
-                el.className = 'confetti';
-                el.style.left = Math.random() * 100 + 'vw';
-                el.style.backgroundColor = ['#f00','#0f0','#00f','#ff0','#f0f'][Math.floor(Math.random()*5)];
-                el.style.animationDelay = Math.random() * 2 + 's';
-                document.body.appendChild(el);
-            }
-        ">
-            <h1 class="text-3xl sm:text-5xl md:text-6xl font-black text-yellow-400 mb-4 sm:mb-8">ΝΙΚΗΤΡΙΑ ΟΜΑΔΑ</h1>
-            <h2 class="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 break-words">{{ $winner['team']->name }}</h2>
-            <p class="text-xl sm:text-2xl md:text-3xl">Τελικό σκορ: {{ $winner['total_score'] }} / {{ $winner['maximum_score'] }}</p>
-            <p class="text-lg sm:text-xl md:text-2xl text-gray-400 mt-2">Μέσος όρος: {{ number_format($winner['average_score'], 2, ',', '') }} / 12</p>
-        </div>
-    @elseif ($talentShow->show_ranking && count($ranking) > 0)
-        <h1 class="text-2xl sm:text-4xl md:text-5xl font-bold mb-6 sm:mb-12 text-center">Τελική κατάταξη</h1>
-        <div class="w-full space-y-3 sm:space-y-4">
-            @foreach ($ranking as $item)
-                <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 p-4 sm:p-6 bg-gray-900 rounded-xl sm:rounded-2xl text-lg sm:text-2xl">
-                    <span class="text-2xl sm:text-4xl font-black text-indigo-400 sm:w-16">{{ $item['ranking_position'] }}η</span>
-                    <span class="flex-1 font-bold break-words">{{ $item['team']->name }}</span>
-                    <span class="text-indigo-300 shrink-0">{{ $item['total_score'] }} / {{ $item['maximum_score'] }}</span>
-                </div>
-            @endforeach
-        </div>
+    @if ($talentShow->show_final_overview)
+        @include('livewire.presentation.partials.final-overview', [
+            'talentShow' => $talentShow,
+            'ranking' => $ranking,
+            'winner' => $winner,
+            'showTitle' => false,
+        ])
+    @elseif (($podium['step'] ?? 0) > 0)
+        @include('livewire.presentation.partials.podium-reveal', [
+            'talentShow' => $talentShow,
+            'podium' => $podium,
+            'sceneKey' => $presentationScene,
+            'showTitle' => false,
+        ])
+    @elseif ($talentShow->show_ranking)
+        <h1 class="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-300 text-center px-4">Αναμονή αποκάλυψης top 5...</h1>
     @elseif ($currentTeam)
         <div class="text-center w-full px-2">
             <p class="text-lg sm:text-2xl md:text-3xl text-gray-400 mb-3 sm:mb-4">Τρέχουσα ομάδα</p>
@@ -58,15 +50,12 @@
                         @endif
                     @endforeach
                 </div>
-                <p class="text-xl sm:text-3xl md:text-4xl font-bold">
+                <p class="text-xl sm:text-3xl md:text-4xl font-black text-white tabular-nums">
                     @if ($scores['is_complete'])
-                        Συνολικό σκορ: {{ $scores['total_score'] }} / {{ $scores['maximum_score'] }}
+                        Συνολικό σκορ: {{ $scores['total_score'] }}
                     @else
                         Προσωρινό σκορ: {{ $scores['total_score'] }}
                     @endif
-                </p>
-                <p class="text-lg sm:text-2xl md:text-3xl text-gray-400 mt-2">
-                    Μέσος όρος: {{ number_format($scores['average_score'], 2, ',', '') }} / 12
                 </p>
                 @if (! $scores['is_complete'])
                     <p class="text-base sm:text-xl text-indigo-300 mt-3">
@@ -85,5 +74,6 @@
     @else
         <h1 class="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-500 text-center">Αναμονή έναρξης...</h1>
     @endif
+    </div>
     </div>
 </div>

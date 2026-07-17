@@ -24,15 +24,15 @@ class ResultsExportController extends Controller
         $scoringJudges = $talentShow->scoringJudges()->get();
         $finalVoter = $talentShow->finalVoter();
 
-        // Line chart: teams with scores, lowest average → highest.
+        // Line chart: teams with scores, lowest total → highest.
         $chartItems = collect($report['ranking'])
             ->filter(function (array $item) {
                 return $item['votes_count'] > 0
                     || collect($item['judge_scores'])->contains('has_voted', true);
             })
             ->sort(function (array $a, array $b) {
-                return [$a['average_score'], $a['total_score'], $a['team']->display_order]
-                    <=> [$b['average_score'], $b['total_score'], $b['team']->display_order];
+                return [$a['total_score'], $a['team']->display_order]
+                    <=> [$b['total_score'], $b['team']->display_order];
             })
             ->values()
             ->all();
@@ -67,7 +67,7 @@ class ResultsExportController extends Controller
             foreach ($report['judges'] as $judge) {
                 $header[] = $judge->name;
             }
-            $header = array_merge($header, ['Σύνολο', 'Μέγιστο', 'Μ.Ο.', 'Ψήφοι', 'Κριτές', '12άρια', '10άρια', '9άρια', 'Κατάσταση']);
+            $header = array_merge($header, ['Σύνολο', 'Ψήφοι', 'Κριτές', '12άρια', '10άρια', '9άρια', 'Κατάσταση']);
             fputcsv($handle, $header, ';');
 
             foreach ($report['ranking'] as $item) {
@@ -84,8 +84,6 @@ class ResultsExportController extends Controller
                 }
 
                 $row[] = $item['total_score'];
-                $row[] = $item['maximum_score'];
-                $row[] = number_format($item['average_score'], 2, ',', '');
                 $row[] = $item['votes_count'];
                 $row[] = $item['active_judges_count'];
                 $row[] = $item['number_of_twelves'];

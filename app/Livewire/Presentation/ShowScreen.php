@@ -30,15 +30,14 @@ class ShowScreen extends Component
         $judgeStatus = $currentTeam && $this->talentShow->show_live_scores && $scores && $scores['votes_count'] > 0
             ? $scoreCalculationService->judgeVoteStatus($this->talentShow, $currentTeam)
             : [];
-        $ranking = $this->talentShow->show_ranking
+        $ranking = $this->talentShow->show_ranking || $this->talentShow->show_final_overview
             ? array_values(array_filter(
                 $resultsService->getRanking($this->talentShow),
                 fn ($item) => $item['is_complete']
             ))
             : [];
-        $winner = $this->talentShow->winner_revealed
-            ? $resultsService->getWinner($this->talentShow)
-            : null;
+        $podium = $resultsService->getPodiumRevealState($this->talentShow);
+        $winner = $resultsService->getWinner($this->talentShow);
 
         return view('livewire.presentation.show-screen', [
             'currentTeam' => $currentTeam,
@@ -46,21 +45,26 @@ class ShowScreen extends Component
             'voteProgress' => $voteProgress,
             'judgeStatus' => $judgeStatus,
             'ranking' => $ranking,
+            'podium' => $podium,
             'winner' => $winner,
-            'presentationScene' => $this->presentationSceneKey($currentTeam, $ranking, $winner),
+            'presentationScene' => $this->presentationSceneKey($currentTeam, $ranking, $podium),
         ]);
     }
 
-    protected function presentationSceneKey($currentTeam, array $ranking, $winner): string
+    protected function presentationSceneKey($currentTeam, array $ranking, array $podium): string
     {
         $show = $this->talentShow;
 
-        if ($winner && $show->winner_revealed) {
-            return 'winner';
+        if ($show->show_final_overview) {
+            return 'final-overview';
         }
 
-        if ($show->show_ranking && count($ranking) > 0) {
-            return 'ranking';
+        if (($podium['step'] ?? 0) > 0) {
+            return 'podium-'.$podium['step'].'-'.($podium['current']['team']->id ?? 0);
+        }
+
+        if ($show->show_ranking) {
+            return 'awaiting-podium';
         }
 
         if ($currentTeam) {

@@ -1,6 +1,7 @@
 @php
     $links = [
         ['route' => 'admin.talent-shows.show', 'label' => 'Επισκόπηση'],
+        ['route' => 'admin.talent-shows.edit', 'label' => 'Ρυθμίσεις'],
         ['route' => 'admin.talent-shows.teams', 'label' => 'Ομάδες'],
         ['route' => 'admin.talent-shows.judges', 'label' => 'Κριτές'],
         ['route' => 'admin.talent-shows.live-control', 'label' => 'Ζωντανός έλεγχος'],
