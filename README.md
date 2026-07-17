@@ -125,3 +125,4 @@ docker compose exec laravel.test php artisan test
 Δημιουργεί demo show με 8 ομάδες και 5 κριτές (`slug: demo-talent-show-2026`).
 # Talent-Show
 # Talent-Show
+# Talent-show-2026
