@@ -1,12 +1,8 @@
 <?php
 
 /**
- * Hostinger bridge: place these files in the domain document root (usually public_html).
- * Laravel project must live next to public_html as: ../talent-show
- *
- * domains/vprint.gr/
- *   public_html/     ← document root (this file)
- *   talent-show/     ← full Laravel project
+ * Place this file in: domains/vprint.gr/public_html/index.php
+ * Laravel app must be at: domains/vprint.gr/talent-show
  */
 
 use Illuminate\Foundation\Application;
@@ -14,11 +10,25 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
-$laravelRoot = dirname(__DIR__).'/talent-show';
+$candidates = [
+    dirname(__DIR__).'/talent-show',
+    __DIR__.'/../talent-show',
+    __DIR__.'/talent-show',
+    '/home/u758690321/domains/vprint.gr/talent-show',
+];
 
-if (! is_dir($laravelRoot)) {
+$laravelRoot = null;
+foreach ($candidates as $candidate) {
+    if (is_file($candidate.'/bootstrap/app.php') && is_file($candidate.'/vendor/autoload.php')) {
+        $laravelRoot = $candidate;
+        break;
+    }
+}
+
+if ($laravelRoot === null) {
     http_response_code(500);
-    echo 'Laravel project not found at: '.$laravelRoot;
+    header('Content-Type: text/plain; charset=UTF-8');
+    echo "Laravel not found.\nChecked:\n- ".implode("\n- ", $candidates)."\n";
     exit(1);
 }
 
@@ -31,7 +41,7 @@ require $laravelRoot.'/vendor/autoload.php';
 /** @var Application $app */
 $app = require_once $laravelRoot.'/bootstrap/app.php';
 
-// Ensure Vite/assets resolve to talent-show/public (not public/public).
-$app->usePublicPath($laravelRoot.'/public');
+// public_html IS the web public directory on Hostinger.
+$app->usePublicPath(__DIR__);
 
 $app->handleRequest(Request::capture());
