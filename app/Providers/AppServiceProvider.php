@@ -41,8 +41,12 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(TalentShow::class, TalentShowPolicy::class);
 
         View::composer('layouts.judge', function ($view) {
-            $judge = session('judge_id') ? Judge::find(session('judge_id')) : null;
-            $talentShow = session('talent_show_id') ? TalentShow::find(session('talent_show_id')) : null;
+            $routeJudge = request()->route('judge');
+            $judge = $routeJudge instanceof Judge
+                ? $routeJudge
+                : (session('judge_id') ? Judge::find(session('judge_id')) : null);
+            $talentShow = $judge?->talentShow
+                ?? (session('talent_show_id') ? TalentShow::find(session('talent_show_id')) : null);
 
             $view->with([
                 'layoutJudge' => $judge,

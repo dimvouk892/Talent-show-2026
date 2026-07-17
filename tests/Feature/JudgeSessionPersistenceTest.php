@@ -21,7 +21,7 @@ class JudgeSessionPersistenceTest extends TalentShowTestCase
 
         Carbon::setTestNow(now()->addHours(2));
 
-        app(JudgeAccessService::class)->keepAlive(request());
+        app(JudgeAccessService::class)->keepAlive(request(), $judge);
 
         $session->refresh();
         $this->assertTrue($session->expires_at->greaterThan($originalExpiry));

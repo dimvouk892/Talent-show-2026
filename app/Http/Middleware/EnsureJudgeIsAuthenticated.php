@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Judge;
 use App\Services\JudgeAccessService;
 use Closure;
 use Illuminate\Http\Request;
@@ -15,7 +16,10 @@ class EnsureJudgeIsAuthenticated
 
     public function handle(Request $request, Closure $next): Response
     {
-        $judge = $this->judgeAccessService->validateSession($request);
+        $routeJudge = $request->route('judge');
+        $expectedJudge = $routeJudge instanceof Judge ? $routeJudge : null;
+
+        $judge = $this->judgeAccessService->validateSession($request, $expectedJudge);
 
         if (! $judge) {
             if ($request->expectsJson()) {
@@ -26,10 +30,9 @@ class EnsureJudgeIsAuthenticated
                 ->with('error', 'Η σύνδεσή σας έληξε ή ανακλήθηκε.');
         }
 
-        $routeJudge = $request->route('judge');
-
-        if ($routeJudge && (int) $routeJudge->id !== $judge->id) {
-            return redirect()->route('judge.vote', $judge);
+        if ($expectedJudge && (int) $expectedJudge->id !== $judge->id) {
+            return redirect()->route('judge.access.denied')
+                ->with('error', 'Η σύνδεσή σας δεν αντιστοιχεί σε αυτόν τον κριτή.');
         }
 
         $request->attributes->set('judge', $judge);

@@ -27,6 +27,7 @@ class JudgeAccessTest extends TalentShowTestCase
             ->assertRedirect(route('judge.vote', $judge));
 
         $this->assertEquals($judge->id, session('judge_id'));
+        $this->assertNotEmpty(session('judge_auth.'.$judge->id));
     }
 
     public function test_invalid_qr_token_rejected(): void
@@ -90,16 +91,16 @@ class JudgeAccessTest extends TalentShowTestCase
         $this->get(route('judge.access', ['judge' => $judge, 'token' => $token]))
             ->assertRedirect(route('judge.vote', $judge));
 
-        $sessionId = session('judge_session_id');
+        $sessionId = session('judge_auth.'.$judge->id.'.session_id');
 
         $this->get(route('judge.access', ['judge' => $judge, 'token' => $token]))
             ->assertRedirect(route('judge.vote', $judge));
 
         $this->assertEquals($judge->id, session('judge_id'));
-        $this->assertEquals($sessionId, session('judge_session_id'));
+        $this->assertEquals($sessionId, session('judge_auth.'.$judge->id.'.session_id'));
     }
 
-    public function test_different_judge_qr_switches_logged_in_judge(): void
+    public function test_multiple_judges_can_stay_logged_in_same_browser(): void
     {
         $judge1 = $this->show->judges()->first();
         $judge2 = $this->show->judges()->skip(1)->first();
@@ -113,8 +114,50 @@ class JudgeAccessTest extends TalentShowTestCase
         $this->get(route('judge.access', ['judge' => $judge2, 'token' => $token2]))
             ->assertRedirect(route('judge.vote', $judge2));
 
-        $this->assertEquals($judge2->id, session('judge_id'));
-        $this->assertEquals($this->show->id, session('talent_show_id'));
+        $this->assertNotEmpty(session('judge_auth.'.$judge1->id));
+        $this->assertNotEmpty(session('judge_auth.'.$judge2->id));
+
+        $this->get(route('judge.vote', $judge1))->assertOk()->assertSee($judge1->name);
+        $this->get(route('judge.vote', $judge2))->assertOk()->assertSee($judge2->name);
+    }
+
+    public function test_logging_out_one_judge_keeps_other_judge_session(): void
+    {
+        $judge1 = $this->show->judges()->first();
+        $judge2 = $this->show->judges()->skip(1)->first();
+
+        $this->loginJudge($judge1);
+        $this->loginJudge($judge2);
+
+        $this->post(route('judge.logout', $judge1))
+            ->assertRedirect(route('judge.access.denied'));
+
+        $this->assertEmpty(session('judge_auth.'.$judge1->id));
+        $this->assertNotEmpty(session('judge_auth.'.$judge2->id));
+
+        $this->get(route('judge.vote', $judge1))->assertRedirect(route('judge.access.denied'));
+        $this->get(route('judge.vote', $judge2))->assertOk()->assertSee($judge2->name);
+    }
+
+    public function test_different_judge_qr_does_not_kick_previous_judge(): void
+    {
+        $judge1 = $this->show->judges()->first();
+        $judge2 = $this->show->judges()->skip(1)->first();
+
+        $token1 = $this->generateQrToken($judge1);
+        $token2 = $this->generateQrToken($judge2);
+
+        $this->get(route('judge.access', ['judge' => $judge1, 'token' => $token1]))
+            ->assertRedirect(route('judge.vote', $judge1));
+
+        $session1 = session('judge_auth.'.$judge1->id.'.session_id');
+
+        $this->get(route('judge.access', ['judge' => $judge2, 'token' => $token2]))
+            ->assertRedirect(route('judge.vote', $judge2));
+
+        $this->assertEquals($session1, session('judge_auth.'.$judge1->id.'.session_id'));
+        $this->assertEquals($this->show->id, session('judge_auth.'.$judge1->id.'.talent_show_id'));
+        $this->assertEquals($this->show->id, session('judge_auth.'.$judge2->id.'.talent_show_id'));
     }
 
     public function test_qr_regeneration_invalidates_old_token(): void

@@ -16,6 +16,8 @@ use Livewire\Component;
 #[Layout('layouts.judge')]
 class VotePanel extends Component
 {
+    public Judge $judge;
+
     public ?int $selectedScore = null;
 
     public ?int $selectedTeamId = null;
@@ -34,24 +36,22 @@ class VotePanel extends Component
 
     public function mount(Judge $judge): void
     {
-        if ((int) session('judge_id') !== $judge->id) {
-            $this->redirect(route('judge.access.denied'), navigate: true);
-        }
+        $this->judge = $judge;
     }
 
     protected function getJudge(): ?Judge
     {
-        return Judge::find(session('judge_id'));
+        return $this->judge->fresh(['talentShow']);
     }
 
     protected function getTalentShow(): ?TalentShow
     {
-        return TalentShow::with('currentTeam')->find(session('talent_show_id'));
+        return TalentShow::with('currentTeam')->find($this->judge->talent_show_id);
     }
 
     public function keepAlive(JudgeAccessService $judgeAccessService): void
     {
-        $judge = $judgeAccessService->keepAlive(request());
+        $judge = $judgeAccessService->keepAlive(request(), $this->judge);
 
         if (! $judge) {
             $this->redirect(route('judge.access.denied'), navigate: true);
@@ -63,7 +63,7 @@ class VotePanel extends Component
 
         if ($talentShow->status->isFinished()) {
             $this->showCompleted = true;
-            $judgeAccessService->logout(request());
+            $judgeAccessService->logout(request(), $judge);
 
             return;
         }

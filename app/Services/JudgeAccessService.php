@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\TalentShowStatus;
 use App\Models\Judge;
 use App\Models\JudgeSession;
 use App\Models\TalentShow;
@@ -41,6 +40,7 @@ class JudgeAccessService
 
         if ($revokePreviousSessions) {
             $this->revokeAllSessions($judge);
+            $this->forgetJudgeAuth($judge->id);
         }
 
         $this->auditLogService->log(
@@ -64,6 +64,7 @@ class JudgeAccessService
         ]);
 
         $this->revokeAllSessions($judge);
+        $this->forgetJudgeAuth($judge->id);
 
         $this->auditLogService->log(
             action: 'qr_revoked',
@@ -140,8 +141,7 @@ class JudgeAccessService
 
         $judge->update(['last_access_at' => now()]);
 
-        session()->put('judge_session_token', $sessionToken);
-
+        $this->putJudgeAuth($judge, $session, $sessionToken);
         $this->configureLaravelSessionLifetime();
 
         return $session;
@@ -150,72 +150,84 @@ class JudgeAccessService
     public function authenticateViaQr(string $plainToken, Request $request): Judge
     {
         $judge = $this->validateQrToken($plainToken);
-        $currentJudgeId = session('judge_id');
 
-        if ($currentJudgeId && (int) $currentJudgeId === $judge->id) {
-            $existing = $this->validateSession($request);
-
-            if ($existing) {
-                return $existing;
-            }
+        // Same judge already authenticated in this browser — reuse (no impact on other judges).
+        $existing = $this->validateSessionForJudge($judge->id);
+        if ($existing) {
+            return $existing;
         }
 
-        if ($currentJudgeId && (int) $currentJudgeId !== $judge->id) {
-            $this->logout($request);
-        }
-
-        $request->session()->regenerate();
-
-        $session = $this->createJudgeSession($judge, $request);
-
-        session([
-            'judge_id' => $judge->id,
-            'judge_session_id' => $session->id,
-            'talent_show_id' => $judge->talent_show_id,
-            'authenticated_at' => now()->toIso8601String(),
-        ]);
+        // Do not logout other judges and do not regenerate the Laravel session id:
+        // regenerating would break Livewire/CSRF in other open judge tabs.
+        $this->createJudgeSession($judge, $request);
 
         return $judge;
     }
 
-    public function validateSession(Request $request): ?Judge
+    public function validateSession(Request $request, Judge|int|null $judge = null): ?Judge
     {
-        $judgeId = session('judge_id');
-        $sessionId = session('judge_session_id');
-        $talentShowId = session('talent_show_id');
-        $sessionToken = session('judge_session_token');
+        $judgeId = $this->resolveJudgeId($request, $judge);
 
-        if (! $judgeId || ! $sessionId || ! $talentShowId || ! $sessionToken) {
+        if (! $judgeId) {
+            return null;
+        }
+
+        return $this->validateSessionForJudge($judgeId);
+    }
+
+    public function validateSessionForJudge(int $judgeId): ?Judge
+    {
+        $auth = $this->getJudgeAuth($judgeId);
+
+        if (! $auth) {
             return null;
         }
 
         $judge = Judge::with('talentShow')->find($judgeId);
 
         if (! $judge || ! $judge->is_active) {
+            $this->forgetJudgeAuth($judgeId);
+
             return null;
         }
 
-        if ($judge->talent_show_id !== (int) $talentShowId) {
+        if ($judge->talent_show_id !== (int) ($auth['talent_show_id'] ?? 0)) {
+            $this->forgetJudgeAuth($judgeId);
+
             return null;
         }
 
         $talentShow = $judge->talentShow;
 
         if (! $talentShow) {
+            $this->forgetJudgeAuth($judgeId);
+
             return null;
         }
 
-        $judgeSession = JudgeSession::find($sessionId);
+        $judgeSession = JudgeSession::find($auth['session_id'] ?? null);
 
         if (! $judgeSession || $judgeSession->revoked_at !== null) {
+            $this->forgetJudgeAuth($judgeId);
+
             return null;
         }
 
-        if ($judgeSession->session_token_hash !== $this->hashToken($sessionToken)) {
+        if ($judgeSession->judge_id !== $judgeId) {
+            $this->forgetJudgeAuth($judgeId);
+
+            return null;
+        }
+
+        if ($judgeSession->session_token_hash !== $this->hashToken((string) ($auth['token'] ?? ''))) {
+            $this->forgetJudgeAuth($judgeId);
+
             return null;
         }
 
         if ($judgeSession->expires_at->isPast()) {
+            $this->forgetJudgeAuth($judgeId);
+
             return null;
         }
 
@@ -239,9 +251,9 @@ class JudgeAccessService
         ]);
     }
 
-    public function keepAlive(Request $request): ?Judge
+    public function keepAlive(Request $request, Judge|int|null $judge = null): ?Judge
     {
-        return $this->validateSession($request);
+        return $this->validateSession($request, $judge);
     }
 
     public function revokeSession(?int $sessionId): void
@@ -261,6 +273,8 @@ class JudgeAccessService
             ->whereNull('revoked_at')
             ->update(['revoked_at' => now()]);
 
+        $this->forgetJudgeAuth($judge->id);
+
         $this->auditLogService->log(
             action: 'judge_sessions_revoked',
             entityType: 'judge',
@@ -277,6 +291,10 @@ class JudgeAccessService
             ->whereNull('revoked_at')
             ->update(['revoked_at' => now()]);
 
+        foreach ($judgeIds as $judgeId) {
+            $this->forgetJudgeAuth((int) $judgeId);
+        }
+
         $this->auditLogService->log(
             action: 'all_judge_sessions_revoked',
             entityType: 'talent_show',
@@ -288,19 +306,28 @@ class JudgeAccessService
         return $count;
     }
 
-    public function logout(Request $request): void
+    public function logout(Request $request, Judge|int|null $judge = null): void
     {
-        $this->revokeSession(session('judge_session_id'));
+        $judgeId = $this->resolveJudgeId($request, $judge);
 
-        $request->session()->forget([
-            'judge_id',
-            'judge_session_id',
-            'talent_show_id',
-            'authenticated_at',
-            'judge_session_token',
-        ]);
+        if (! $judgeId) {
+            return;
+        }
 
-        $request->session()->regenerate();
+        $auth = $this->getJudgeAuth($judgeId);
+        $this->revokeSession($auth['session_id'] ?? null);
+        $this->forgetJudgeAuth($judgeId);
+    }
+
+    public function authenticatedJudgeIds(): array
+    {
+        $bag = session('judge_auth', []);
+
+        if (! is_array($bag)) {
+            return [];
+        }
+
+        return array_map('intval', array_keys($bag));
     }
 
     public function getConnectedJudgesCount(TalentShow $talentShow): int
@@ -315,6 +342,103 @@ class JudgeAccessService
             ->whereIn('judge_id', $talentShow->judges()->pluck('id'))
             ->distinct('judge_id')
             ->count('judge_id');
+    }
+
+    protected function putJudgeAuth(Judge $judge, JudgeSession $session, string $plainToken): void
+    {
+        session()->put('judge_auth.'.$judge->id, [
+            'session_id' => $session->id,
+            'token' => $plainToken,
+            'talent_show_id' => $judge->talent_show_id,
+            'authenticated_at' => now()->toIso8601String(),
+        ]);
+
+        // Legacy single-judge keys (last active) for older helpers / redirects.
+        session([
+            'judge_id' => $judge->id,
+            'judge_session_id' => $session->id,
+            'talent_show_id' => $judge->talent_show_id,
+            'authenticated_at' => now()->toIso8601String(),
+            'judge_session_token' => $plainToken,
+        ]);
+    }
+
+    protected function getJudgeAuth(int $judgeId): ?array
+    {
+        $auth = session('judge_auth.'.$judgeId);
+
+        if (is_array($auth) && ! empty($auth['session_id']) && ! empty($auth['token'])) {
+            return $auth;
+        }
+
+        // Migrate legacy single-judge session into per-judge bag.
+        if ((int) session('judge_id') === $judgeId && session('judge_session_id') && session('judge_session_token')) {
+            $legacy = [
+                'session_id' => (int) session('judge_session_id'),
+                'token' => (string) session('judge_session_token'),
+                'talent_show_id' => (int) session('talent_show_id'),
+                'authenticated_at' => session('authenticated_at'),
+            ];
+            session()->put('judge_auth.'.$judgeId, $legacy);
+
+            return $legacy;
+        }
+
+        return null;
+    }
+
+    protected function forgetJudgeAuth(int $judgeId): void
+    {
+        session()->forget('judge_auth.'.$judgeId);
+
+        if ((int) session('judge_id') === $judgeId) {
+            session()->forget([
+                'judge_id',
+                'judge_session_id',
+                'talent_show_id',
+                'authenticated_at',
+                'judge_session_token',
+            ]);
+
+            $remaining = $this->authenticatedJudgeIds();
+            if ($remaining !== []) {
+                $nextId = $remaining[array_key_last($remaining)];
+                $next = $this->getJudgeAuth($nextId);
+                if ($next) {
+                    session([
+                        'judge_id' => $nextId,
+                        'judge_session_id' => $next['session_id'],
+                        'talent_show_id' => $next['talent_show_id'],
+                        'authenticated_at' => $next['authenticated_at'] ?? null,
+                        'judge_session_token' => $next['token'],
+                    ]);
+                }
+            }
+        }
+    }
+
+    protected function resolveJudgeId(Request $request, Judge|int|null $judge): ?int
+    {
+        if ($judge instanceof Judge) {
+            return $judge->id;
+        }
+
+        if (is_int($judge)) {
+            return $judge;
+        }
+
+        $routeJudge = $request->route('judge');
+        if ($routeJudge instanceof Judge) {
+            return $routeJudge->id;
+        }
+
+        if (is_numeric($routeJudge)) {
+            return (int) $routeJudge;
+        }
+
+        $fromSession = session('judge_id');
+
+        return $fromSession ? (int) $fromSession : null;
     }
 
     protected function configureLaravelSessionLifetime(): void

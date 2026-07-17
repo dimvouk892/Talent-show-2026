@@ -22,12 +22,14 @@
                     @endif
                 @endif
             </div>
-            <form method="POST" action="{{ route('judge.logout') }}" class="absolute right-3 top-3">
+            @if ($layoutJudge)
+            <form method="POST" action="{{ route('judge.logout', $layoutJudge) }}" class="absolute right-3 top-3">
                 @csrf
                 <button type="submit" class="btn-touch-sm text-slate-400 hover:text-white hover:bg-slate-800 focus-visible:ring-slate-500" aria-label="Αποσύνδεση">
                     Αποσύνδεση
                 </button>
             </form>
+            @endif
         </header>
         <main class="flex-1 w-full px-4 py-4 sm:py-6 safe-bottom" role="main">
             @if (session('error'))

@@ -35,15 +35,15 @@ Route::get('/judge/access/{judge}/{token}', AccessController::class)
 Route::middleware(['judge.auth'])->group(function () {
     Route::get('/judge/{judge}/vote', VotePanel::class)->name('judge.vote');
     Route::get('/judge/vote', function () {
-        $judgeId = session('judge_id');
+        $ids = app(\App\Services\JudgeAccessService::class)->authenticatedJudgeIds();
 
-        if (! $judgeId) {
+        if ($ids === []) {
             return redirect()->route('judge.access.denied');
         }
 
-        return redirect()->route('judge.vote', ['judge' => $judgeId]);
+        return redirect()->route('judge.vote', ['judge' => $ids[array_key_last($ids)]]);
     });
-    Route::post('/judge/logout', LogoutController::class)->name('judge.logout');
+    Route::post('/judge/{judge}/logout', LogoutController::class)->name('judge.logout');
 });
 
 Route::get('/monitor', ShowScreen::class)->name('presentation.show');
