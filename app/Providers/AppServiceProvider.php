@@ -13,7 +13,27 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Hostinger / misconfigured docroot can resolve public_path to .../public/public.
+        // Point Vite at the real public folder that contains build/manifest.json.
+        $manifest = public_path('build/manifest.json');
+
+        if (is_file($manifest)) {
+            return;
+        }
+
+        $candidates = [
+            base_path('public'),
+            dirname(public_path()),
+            base_path(),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_file($candidate.DIRECTORY_SEPARATOR.'build'.DIRECTORY_SEPARATOR.'manifest.json')) {
+                $this->app->usePublicPath($candidate);
+
+                return;
+            }
+        }
     }
 
     public function boot(): void
