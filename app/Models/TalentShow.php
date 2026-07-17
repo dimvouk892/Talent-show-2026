@@ -51,7 +51,9 @@ class TalentShow extends Model
             return null;
         }
 
-        return asset('storage/'.$this->presentation_bg_path);
+        // Serve via app route so Hostinger public_html works even if the
+        // storage symlink is missing or broken after deploy copies.
+        return route('media.public', ['path' => $this->presentation_bg_path]);
     }
 
     public function hasPresentationBackground(): bool

@@ -3,7 +3,7 @@
         @if ($talentShow->presentation_bg_type === 'video')
             <video class="absolute inset-0 h-full w-full min-h-full min-w-full object-cover"
                    src="{{ $talentShow->presentationBackgroundUrl() }}"
-                   autoplay muted loop playsinline></video>
+                   autoplay muted loop playsinline webkit-playsinline preload="auto"></video>
         @else
             <img class="absolute inset-0 h-full w-full min-h-full min-w-full object-cover"
                  src="{{ $talentShow->presentationBackgroundUrl() }}"

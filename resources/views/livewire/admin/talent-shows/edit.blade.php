@@ -40,16 +40,22 @@
         </div>
     </form>
 
-    <section class="card space-y-3" aria-label="Φόντο παρουσίασης">
+    <section class="card space-y-3" aria-label="Φόντο παρουσίασης"
+             x-data="{ uploading: false, progress: 0 }">
         <h2 class="text-lg font-bold">Φόντο monitor</h2>
-        <p class="text-sm text-gray-500">Εικόνα ή βίντεο ως φόντο στις οθόνες παρουσίασης (έως 512MB).</p>
+        <p class="text-sm text-gray-500">Εικόνα ή βίντεο (mp4/webm) ως φόντο στις οθόνες παρουσίασης. Προτεινόμενο έως ~200MB για σταθερό ανέβασμα στο Hostinger (μέγιστο 512MB).</p>
 
         @if ($talentShow->hasPresentationBackground())
             <div class="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm space-y-2">
                 <p>Ενεργό: <strong>{{ $talentShow->presentation_bg_type === 'video' ? 'Βίντεο' : 'Εικόνα' }}</strong></p>
                 @if ($talentShow->presentation_bg_type === 'image')
                     <img src="{{ $talentShow->presentationBackgroundUrl() }}" alt="" class="max-h-40 rounded-lg object-cover w-full">
+                @else
+                    <video class="max-h-48 w-full rounded-lg object-cover bg-black"
+                           src="{{ $talentShow->presentationBackgroundUrl() }}"
+                           controls muted playsinline preload="metadata"></video>
                 @endif
+                <a href="{{ $talentShow->presentationBackgroundUrl() }}" target="_blank" rel="noopener" class="text-indigo-700 underline text-xs">Άνοιγμα αρχείου ↗</a>
                 <button type="button" wire:click="removePresentationBackground" class="w-full btn-touch border border-red-300 text-red-700 hover:bg-red-50">
                     Αφαίρεση φόντου
                 </button>
@@ -61,16 +67,31 @@
             <input id="presentation-bg"
                    type="file"
                    wire:model="presentationBackground"
-                   accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+                   accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v"
+                   x-on:livewire-upload-start="uploading = true; progress = 0"
+                   x-on:livewire-upload-progress="progress = $event.detail.progress"
+                   x-on:livewire-upload-finish="uploading = false; progress = 100"
+                   x-on:livewire-upload-error="uploading = false; progress = 0"
                    class="input-touch">
-            @error('presentationBackground') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
-            <div wire:loading wire:target="presentationBackground" class="text-sm text-indigo-700 mt-1">Μεταφόρτωση…</div>
+            @error('presentationBackground') <span class="text-red-600 text-sm block mt-1">{{ $message }}</span> @enderror
+            <div wire:loading wire:target="presentationBackground" class="text-sm text-indigo-700 mt-1">Μεταφόρτωση προσωρινού αρχείου…</div>
+            <div x-show="uploading" x-cloak class="mt-2">
+                <div class="h-2 rounded-full bg-gray-200 overflow-hidden">
+                    <div class="h-2 bg-indigo-600 transition-all" :style="'width:' + progress + '%'"></div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1" x-text="'Πρόοδος: ' + progress + '%'"></p>
+            </div>
+            @if ($presentationBackground)
+                <p class="text-sm text-green-700 mt-2">Το αρχείο φορτώθηκε — πατήστε «Αποθήκευση φόντου».</p>
+            @endif
         </div>
         <button type="button"
                 wire:click="savePresentationBackground"
                 wire:loading.attr="disabled"
+                wire:target="savePresentationBackground,presentationBackground"
                 class="w-full btn-touch bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-40">
-            Αποθήκευση φόντου
+            <span wire:loading.remove wire:target="savePresentationBackground">Αποθήκευση φόντου</span>
+            <span wire:loading wire:target="savePresentationBackground">Αποθήκευση…</span>
         </button>
     </section>
 

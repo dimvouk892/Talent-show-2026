@@ -73,10 +73,17 @@ class Edit extends Component
     public function savePresentationBackground(TalentShowControlService $control): void
     {
         $this->validate([
-            'presentationBackground' => 'required|file|max:524288|mimetypes:image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime',
+            'presentationBackground' => [
+                'required',
+                'file',
+                'max:524288',
+                'mimes:jpeg,jpg,png,webp,gif,mp4,webm,mov,m4v,qt',
+            ],
         ], [
             'presentationBackground.required' => 'Επιλέξτε εικόνα ή βίντεο.',
             'presentationBackground.max' => 'Μέγιστο μέγεθος 512MB.',
+            'presentationBackground.mimes' => 'Επιτρέπονται jpg, png, webp, gif, mp4, webm, mov.',
+            'presentationBackground.uploaded' => 'Αποτυχία ανεβάσματος. Το αρχείο είναι πολύ μεγάλο ή έληξε το χρονικό όριο του server.',
         ]);
 
         try {

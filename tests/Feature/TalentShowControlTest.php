@@ -516,12 +516,26 @@ class TalentShowControlTest extends TalentShowTestCase
         $this->assertEquals('image', $this->show->presentation_bg_type);
         $this->assertNotNull($this->show->presentation_bg_path);
         $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('public')->exists($this->show->presentation_bg_path));
+        $this->assertStringContainsString('/media/', $this->show->presentationBackgroundUrl());
+
+        $this->get($this->show->presentationBackgroundUrl())->assertOk();
 
         $control->removePresentationBackground($this->show->fresh());
         $this->show->refresh();
 
         $this->assertNull($this->show->presentation_bg_path);
         $this->assertNull($this->show->presentation_bg_type);
+    }
+
+    public function test_presentation_background_accepts_video_by_extension(): void
+    {
+        $file = \Illuminate\Http\UploadedFile::fake()->create('bg.mp4', 1024, 'application/octet-stream');
+
+        app(TalentShowControlService::class)->storePresentationBackground($this->show->fresh(), $file);
+        $this->show->refresh();
+
+        $this->assertEquals('video', $this->show->presentation_bg_type);
+        $this->get(route('media.public', ['path' => $this->show->presentation_bg_path]))->assertOk();
     }
 
     public function test_restart_clears_final_overview_flag(): void

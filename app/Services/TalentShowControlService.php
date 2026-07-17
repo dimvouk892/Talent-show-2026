@@ -486,11 +486,21 @@ class TalentShowControlService
 
     public function storePresentationBackground(TalentShow $talentShow, UploadedFile $file): TalentShow
     {
-        $mime = (string) $file->getMimeType();
-        $type = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : null);
+        $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: '');
+        $mime = (string) ($file->getMimeType() ?: '');
+
+        $videoExtensions = ['mp4', 'webm', 'mov', 'm4v', 'ogg', 'ogv'];
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
+        $type = null;
+        if (str_starts_with($mime, 'video/') || in_array($extension, $videoExtensions, true)) {
+            $type = 'video';
+        } elseif (str_starts_with($mime, 'image/') || in_array($extension, $imageExtensions, true)) {
+            $type = 'image';
+        }
 
         if (! $type) {
-            throw new InvalidArgumentException('Επιτρέπονται μόνο εικόνες ή βίντεο.');
+            throw new InvalidArgumentException('Επιτρέπονται μόνο εικόνες (jpg, png, webp, gif) ή βίντεο (mp4, webm, mov).');
         }
 
         if ($talentShow->presentation_bg_path) {
@@ -498,6 +508,10 @@ class TalentShowControlService
         }
 
         $path = $file->store('talent-shows/'.$talentShow->id.'/background', 'public');
+
+        if (! $path || ! Storage::disk('public')->exists($path)) {
+            throw new InvalidArgumentException('Αποτυχία αποθήκευσης αρχείου. Ελέγξτε δικαιώματα storage.');
+        }
 
         $talentShow->update([
             'presentation_bg_path' => $path,

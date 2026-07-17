@@ -129,17 +129,19 @@ return [
     */
 
     'temporary_file_upload' => [
-        'disk' => env('LIVEWIRE_TEMPORARY_FILE_UPLOAD_DISK'),
-        'rules' => ['required', 'file', 'max:524288'], // 512MB
-        'directory' => null,
-        'middleware' => null,
+        'disk' => env('LIVEWIRE_TEMPORARY_FILE_UPLOAD_DISK', 'local'),
+        'rules' => ['required', 'file', 'max:524288'], // 512MB (KB)
+        'directory' => 'livewire-tmp',
+        'middleware' => 'throttle:120,1',
         'preview_mimes' => [
             'png', 'gif', 'bmp', 'svg', 'wav', 'mp4',
             'mov', 'avi', 'wmv', 'mp3', 'm4a',
-            'jpg', 'jpeg', 'mpga', 'webp', 'wma', 'webm',
+            'jpg', 'jpeg', 'mpga', 'webp', 'wma', 'webm', 'm4v',
         ],
-        'max_upload_time' => 30,
+        'max_upload_time' => 120, // minutes — large Hostinger video uploads
         'cleanup' => true,
+        'chunking' => true,
+        'chunk_size' => 2 * 1024 * 1024, // 2MB chunks (clear shared-hosting limits)
     ],
 
     /*

@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\QrCodeController;
 use App\Http\Controllers\Admin\ResultsExportController;
 use App\Http\Controllers\Judge\AccessController;
 use App\Http\Controllers\Judge\LogoutController;
+use App\Http\Controllers\MediaController;
 use App\Livewire\Admin\AuditLogs;
 use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\Judges\Index as JudgesIndex;
@@ -25,6 +26,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return redirect()->route('admin.login');
 });
+
+Route::get('/media/{path}', MediaController::class)
+    ->where('path', '.*')
+    ->name('media.public');
 
 Route::get('/judge/access/denied', [AccessController::class, 'denied'])->name('judge.access.denied');
 
