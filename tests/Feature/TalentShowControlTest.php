@@ -408,15 +408,19 @@ class TalentShowControlTest extends TalentShowTestCase
         $this->assertNotNull($this->show->winner_team_id);
     }
 
-    public function test_cannot_start_podium_before_ranking(): void
+    public function test_can_start_podium_after_scoring_without_manual_ranking_step(): void
     {
         $this->completeAllVotingWithDistinctScores();
         $control = app(TalentShowControlService::class);
 
-        $this->assertFalse($control->canStartPodiumReveal($this->show->fresh()));
+        $this->assertTrue($control->canStartPodiumReveal($this->show->fresh()));
+        $this->assertFalse($this->show->fresh()->show_ranking);
 
-        $this->expectException(InvalidArgumentException::class);
         $control->startPodiumReveal($this->show->fresh());
+        $this->show->refresh();
+
+        $this->assertTrue($this->show->show_ranking);
+        $this->assertEquals(1, $this->show->podium_reveal_step);
     }
 
     public function test_cannot_start_podium_with_pending_final_vote(): void

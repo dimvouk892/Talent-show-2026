@@ -18,10 +18,12 @@
         $votingFinished = in_array($talentShow->status->value, ['scoring_closed', 'results_ready', 'winner_revealed'], true)
             && ! $hasPendingFinalVote;
         $ceremonyActive = $podium['step'] > 0 && ! $podium['is_complete'];
-        $showPresentationControls = $canShowRanking || $canStartPodiumReveal || $canAdvancePodium || $canRewindPodium
-            || $canShowFinalOverview || $canHideFinalOverview
+        $podiumComplete = $podium['is_complete'] || $talentShow->winner_revealed;
+        $showPodiumControls = $canStartPodiumReveal || $canAdvancePodium || $canRewindPodium || $ceremonyActive;
+        $showEndScreenControls = $canShowFinalOverview || $canHideFinalOverview
             || $canShowFinalChart || $canHideFinalChart
             || $canShowScoreboardPanel;
+        $showPresentationControls = $showPodiumControls || $showEndScreenControls;
     @endphp
 
     {{-- Έναρξη ψηφοφορίας (μόνο από αναμονή / Ready) --}}
@@ -93,100 +95,109 @@
     @endif
 
     @if ($showPresentationControls)
-        <section class="card mb-5 space-y-3" aria-label="Παρουσίαση αποτελεσμάτων">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <h2 class="text-lg font-bold">Παρουσίαση top 5</h2>
-                <a href="{{ route('presentation.show') }}" target="_blank" rel="noopener"
-                   class="btn-touch-sm text-center bg-gray-800 text-white hover:bg-gray-700">
-                    Monitor ↗
-                </a>
-            </div>
-
-            @if ($canShowRanking)
-                <button type="button" wire:click="showRanking" class="w-full btn-touch bg-purple-600 text-white hover:bg-purple-500">
-                    Εμφάνιση κατάταξης (αναμονή top 5)
-                </button>
-            @endif
-
-            @if ($canStartPodiumReveal)
-                <button type="button" wire:click="startPodiumReveal" class="w-full btn-touch bg-yellow-600 text-white hover:bg-yellow-500">
-                    Έναρξη top 5
-                </button>
-                <p class="text-sm text-gray-500 text-center">Αποκάλυψη από την {{ $podium['total_steps'] }}η προς την 1η θέση.</p>
-            @endif
-
-            @if ($ceremonyActive || $canRewindPodium)
-                <p class="text-sm text-center text-gray-600">
-                    Βήμα {{ $podium['step'] }} / {{ $podium['total_steps'] }}
-                    @if ($podium['next'])
-                        — Επόμενο: {{ $podium['next']['ranking_position'] }}η θέση
-                    @elseif ($podium['is_complete'])
-                        — Ολοκληρώθηκε
-                    @endif
-                </p>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button type="button"
-                            wire:click="previousPodiumReveal"
-                            @disabled(! $canRewindPodium)
-                            class="w-full btn-touch border border-gray-300 text-gray-800 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
-                        Προηγούμενο
-                    </button>
-                    <button type="button"
-                            wire:click="nextPodiumReveal"
-                            @disabled(! $canAdvancePodium)
-                            class="w-full btn-touch bg-yellow-600 text-white hover:bg-yellow-500 disabled:opacity-40 disabled:cursor-not-allowed">
-                        Επόμενο
-                    </button>
+        @if ($showPodiumControls && ! $podiumComplete)
+            <section class="card mb-5 space-y-3" aria-label="Αποκάλυψη top 5">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <h2 class="text-lg font-bold">Αποκάλυψη 5 → 1</h2>
+                    <a href="{{ route('presentation.show') }}" target="_blank" rel="noopener"
+                       class="btn-touch-sm text-center bg-gray-800 text-white hover:bg-gray-700">
+                        Monitor ↗
+                    </a>
                 </div>
-            @endif
 
-            @if ($canShowFinalOverview)
-                <button type="button" wire:click="showFinalOverview" class="w-full btn-touch bg-indigo-600 text-white hover:bg-indigo-500">
-                    Εμφάνιση κατάταξης νικητή
-                </button>
-            @elseif ($canHideFinalOverview)
-                <button type="button" wire:click="hideFinalOverview" class="w-full btn-touch border border-indigo-300 text-indigo-800 hover:bg-indigo-50">
-                    Απόκρυψη κατάταξης νικητή
-                </button>
-            @endif
+                @if ($canStartPodiumReveal)
+                    <button type="button" wire:click="startPodiumReveal" class="w-full btn-touch text-lg bg-yellow-600 text-white hover:bg-yellow-500">
+                        Αποκάλυψη 5ης θέσης
+                    </button>
+                    <p class="text-sm text-gray-500 text-center">
+                        Ξεκινά η τελετή: 5η → 4η → 3η → 2η → 1η (νικητής).
+                    </p>
+                @endif
 
-            @if ($canShowFinalChart)
-                <button type="button" wire:click="showFinalChart" class="w-full btn-touch bg-teal-600 text-white hover:bg-teal-500">
-                    Εμφάνιση γραφήματος
-                </button>
-            @elseif ($canHideFinalChart)
-                <button type="button" wire:click="hideFinalChart" class="w-full btn-touch border border-teal-300 text-teal-800 hover:bg-teal-50">
-                    Απόκρυψη γραφήματος
-                </button>
-            @endif
+                @if ($ceremonyActive || $canRewindPodium)
+                    <p class="text-sm text-center text-gray-600 font-medium">
+                        Βήμα {{ $podium['step'] }} / {{ $podium['total_steps'] }}
+                        @if ($podium['current'])
+                            — Τώρα: {{ $podium['current']['ranking_position'] }}η θέση
+                        @endif
+                        @if ($podium['next'])
+                            — Επόμενο: {{ $podium['next']['ranking_position'] }}η
+                        @endif
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button type="button"
+                                wire:click="previousPodiumReveal"
+                                @disabled(! $canRewindPodium)
+                                class="w-full btn-touch border border-gray-300 text-gray-800 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            Προηγούμενο
+                        </button>
+                        <button type="button"
+                                wire:click="nextPodiumReveal"
+                                @disabled(! $canAdvancePodium)
+                                class="w-full btn-touch text-lg bg-yellow-600 text-white hover:bg-yellow-500 disabled:opacity-40 disabled:cursor-not-allowed">
+                            @if ($podium['next'])
+                                Αποκάλυψη {{ $podium['next']['ranking_position'] }}ης θέσης
+                            @else
+                                Αποκάλυψη νικητή
+                            @endif
+                        </button>
+                    </div>
+                @endif
+            </section>
+        @endif
 
-            @if ($canShowScoreboardPanel)
-                <a href="{{ route('presentation.panel') }}" target="_blank" rel="noopener"
-                   class="w-full btn-touch bg-slate-800 text-white hover:bg-slate-700 text-center">
-                    Εμφάνιση πίνακα βαθμολογιών ↗
-                </a>
-                <p class="text-sm text-gray-500 text-center">Ανοίγει ξεχωριστή οθόνη με τον πίνακα ομάδες × κριτές.</p>
-            @endif
-        </section>
+        @if ($showEndScreenControls)
+            <section class="card mb-5 space-y-3" aria-label="Οθόνες αποτελεσμάτων">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <h2 class="text-lg font-bold">Οθόνες αποτελεσμάτων</h2>
+                    <a href="{{ route('presentation.show') }}" target="_blank" rel="noopener"
+                       class="btn-touch-sm text-center bg-gray-800 text-white hover:bg-gray-700">
+                        Monitor ↗
+                    </a>
+                </div>
+                <p class="text-sm text-gray-500 text-center">Επιλέξτε τι εμφανίζεται στο monitor.</p>
+
+                @if ($canShowFinalOverview)
+                    <button type="button" wire:click="showFinalOverview" class="w-full btn-touch bg-indigo-600 text-white hover:bg-indigo-500">
+                        Τελική κατάταξη
+                    </button>
+                @elseif ($canHideFinalOverview)
+                    <button type="button" wire:click="hideFinalOverview" class="w-full btn-touch border border-indigo-300 text-indigo-800 hover:bg-indigo-50">
+                        Απόκρυψη τελικής κατάταξης
+                    </button>
+                @endif
+
+                @if ($canShowFinalChart)
+                    <button type="button" wire:click="showFinalChart" class="w-full btn-touch bg-teal-600 text-white hover:bg-teal-500">
+                        Γράφημα
+                    </button>
+                @elseif ($canHideFinalChart)
+                    <button type="button" wire:click="hideFinalChart" class="w-full btn-touch border border-teal-300 text-teal-800 hover:bg-teal-50">
+                        Απόκρυψη γραφήματος
+                    </button>
+                @endif
+
+                @if ($canShowScoreboardPanel)
+                    <a href="{{ route('presentation.panel') }}" target="_blank" rel="noopener"
+                       class="w-full btn-touch bg-slate-800 text-white hover:bg-slate-700 text-center">
+                        Πίνακας βαθμολογιών ↗
+                    </a>
+                @endif
+            </section>
+        @endif
     @elseif ($votingFinished)
         <section class="card mb-5 text-center space-y-2" aria-label="Ολοκλήρωση">
             <p class="text-lg font-semibold text-green-800">Η διαδικασία ολοκληρώθηκε.</p>
-            <p class="text-sm text-gray-500">Μπορείτε να καθαρίσετε ή να ξεκινήσετε ξανά.</p>
-            <div class="flex flex-col sm:flex-row gap-2 justify-center">
-                <a href="{{ route('presentation.show') }}" target="_blank" rel="noopener"
-                   class="inline-flex btn-touch-sm bg-gray-800 text-white hover:bg-gray-700">
-                    Monitor ↗
-                </a>
-                <a href="{{ route('presentation.panel') }}" target="_blank" rel="noopener"
-                   class="inline-flex btn-touch-sm bg-indigo-600 text-white hover:bg-indigo-500">
-                    Πίνακας βαθμολογιών ↗
-                </a>
-            </div>
+            <p class="text-sm text-gray-500">Για νέα εκδήλωση: Ρυθμίσεις → Διαγραφή σκορ, μετά Έναρξη.</p>
+            <a href="{{ route('presentation.show') }}" target="_blank" rel="noopener"
+               class="inline-flex btn-touch-sm bg-gray-800 text-white hover:bg-gray-700">
+                Monitor ↗
+            </a>
         </section>
     @endif
 
-    {{-- Πλήρης βαθμολογία (ίδια με Panel) — μόνο στο τέλος της βαθμολόγησης --}}
-    @if (($showPresentationControls || $votingFinished) && $panelJudges->isNotEmpty() && count($panelRanking) > 0)
+    {{-- Πλήρης βαθμολογία (ίδια με Panel) — μετά την τελετή --}}
+    @if ($showEndScreenControls && $panelJudges->isNotEmpty() && count($panelRanking) > 0)
         <section class="card mb-5 p-0 overflow-hidden" aria-label="Πίνακας βαθμολογιών">
             <div class="px-4 py-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>

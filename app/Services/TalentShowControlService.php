@@ -347,8 +347,11 @@ class TalentShowControlService
         $talentShow->update([
             'winner_team_id' => $winnerId,
             'winner_revealed' => false,
+            'show_ranking' => true,
             'podium_reveal_step' => 1,
             'status' => TalentShowStatus::ResultsReady,
+            'show_final_overview' => false,
+            'show_final_chart' => false,
         ]);
 
         $this->auditLogService->log(
@@ -755,10 +758,6 @@ class TalentShowControlService
             return false;
         }
 
-        if (! $talentShow->show_ranking) {
-            return false;
-        }
-
         if (! in_array($talentShow->status, [
             TalentShowStatus::ScoringClosed,
             TalentShowStatus::ResultsReady,
@@ -823,11 +822,18 @@ class TalentShowControlService
             return false;
         }
 
-        return in_array($talentShow->status, [
-            TalentShowStatus::ScoringClosed,
-            TalentShowStatus::ResultsReady,
-            TalentShowStatus::WinnerRevealed,
-        ], true) || $talentShow->show_ranking || $talentShow->winner_revealed;
+        $podium = $this->resultsService->getPodiumRevealState($talentShow);
+
+        return $talentShow->winner_revealed || $podium['is_complete'];
+    }
+
+    public function canShowEndScreenControls(TalentShow $talentShow): bool
+    {
+        return $this->canShowFinalOverview($talentShow)
+            || $this->canHideFinalOverview($talentShow)
+            || $this->canShowFinalChart($talentShow)
+            || $this->canHideFinalChart($talentShow)
+            || $this->canShowScoreboardPanel($talentShow);
     }
 
     public function canRevealScores(TalentShow $talentShow): bool
@@ -909,17 +915,17 @@ class TalentShowControlService
                 ? ($talentShow->final_vote_open
                     ? 'Αναμονή τελικής ψήφου από τον ειδικό κριτή.'
                     : 'Ανοίξτε την τελική ψήφο όταν είστε έτοιμοι.')
-                : ($talentShow->show_ranking
-                    ? 'Εμφανίστε την τελετή top 5 στο monitor νικητών.'
-                    : 'Εμφανίστε την κατάταξη και μετά την τελετή top 5.'),
-            TalentShowStatus::ResultsReady => $talentShow->podium_reveal_step > 0
-                ? 'Η τελετή top 5 ολοκληρώθηκε ή συνεχίστε τα βήματα.'
-                : 'Ξεκινήστε την αποκάλυψη top 5 (5η → 1η θέση).',
+                : 'Ξεκινήστε την αποκάλυψη (5η → 1η θέση).',
+            TalentShowStatus::ResultsReady => $podium['is_complete']
+                ? 'Επιλέξτε οθόνη: τελική κατάταξη, γράφημα ή πίνακα βαθμολογιών.'
+                : ($talentShow->podium_reveal_step > 0
+                    ? 'Συνεχίστε την αποκάλυψη 5 → 1.'
+                    : 'Ξεκινήστε την αποκάλυψη (5η → 1η θέση).'),
             TalentShowStatus::WinnerRevealed => $talentShow->show_final_overview
                 ? 'Εμφανίζεται η τελική κατάταξη στον monitor.'
                 : ($talentShow->show_final_chart
                     ? 'Εμφανίζεται το γράφημα στον monitor.'
-                    : 'Ο νικητής αποκαλύφθηκε. Επιλέξτε κατάταξη, γράφημα ή πίνακα βαθμολογιών.'),
+                    : 'Επιλέξτε οθόνη: τελική κατάταξη, γράφημα ή πίνακα βαθμολογιών.'),
             TalentShowStatus::Completed => 'Η εκδήλωση ολοκληρώθηκε.',
             TalentShowStatus::Archived => 'Η εκδήλωση είναι αρχειοθετημένη.',
         };
