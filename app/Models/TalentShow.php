@@ -55,9 +55,9 @@ class TalentShow extends Model
             return null;
         }
 
-        // Serve via app route so Hostinger public_html works even if the
-        // storage symlink is missing or broken after deploy copies.
-        return route('media.public', ['path' => $this->presentation_bg_path]);
+        // Prefer static /storage symlink (no PHP) so large background
+        // videos do not stall the monitor under Livewire polling.
+        return asset('storage/'.$this->presentation_bg_path);
     }
 
     public function hasPresentationBackground(): bool

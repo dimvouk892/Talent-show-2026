@@ -577,9 +577,10 @@ class TalentShowControlTest extends TalentShowTestCase
         $this->assertEquals('image', $this->show->presentation_bg_type);
         $this->assertNotNull($this->show->presentation_bg_path);
         $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('public')->exists($this->show->presentation_bg_path));
-        $this->assertStringContainsString('/media/', $this->show->presentationBackgroundUrl());
+        $this->assertStringContainsString('/storage/', $this->show->presentationBackgroundUrl());
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('public')->exists($this->show->presentation_bg_path));
 
-        $this->get($this->show->presentationBackgroundUrl())->assertOk();
+        $this->get(route('media.public', ['path' => $this->show->presentation_bg_path]))->assertOk();
 
         $control->removePresentationBackground($this->show->fresh());
         $this->show->refresh();

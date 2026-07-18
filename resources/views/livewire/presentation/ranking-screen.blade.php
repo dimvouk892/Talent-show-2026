@@ -1,7 +1,7 @@
-<div wire:poll.2s class="relative min-h-screen w-full max-w-4xl mx-auto overflow-x-hidden">
+<div class="relative min-h-screen w-full max-w-4xl mx-auto overflow-x-hidden">
     @include('livewire.presentation.partials.presentation-background', ['talentShow' => $talentShow])
 
-    <div class="relative z-10 flex flex-col items-center justify-center p-4 sm:p-8 min-h-screen bg-black/30">
+    <div wire:poll.2s class="relative z-10 flex flex-col items-center justify-center p-4 sm:p-8 min-h-screen bg-black/30">
         <p class="text-base sm:text-2xl text-gray-300 mb-4 text-center break-words">{{ $talentShow->title }}</p>
 
         @if ($showRanking && count($ranking) > 0)
