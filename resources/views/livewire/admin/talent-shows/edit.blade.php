@@ -94,4 +94,25 @@
             <span wire:loading wire:target="savePresentationBackground">Αποθήκευση…</span>
         </button>
     </section>
+
+    <section class="card mt-5 space-y-3" aria-label="Διαγραφή σκορ">
+        <h2 class="text-lg font-bold text-red-800">Διαγραφή σκορ</h2>
+        <p class="text-sm text-gray-500">Διαγράφει όλες τις βαθμολογίες και επιστρέφει την εκδήλωση σε αναμονή. Η έναρξη γίνεται από τον Ζωντανό Έλεγχο.</p>
+        <button type="button" wire:click="askClearScores" class="w-full btn-touch bg-red-600 text-white hover:bg-red-500">
+            Διαγραφή σκορ
+        </button>
+    </section>
+
+    @if ($showClearScoresConfirm)
+        <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="clear-scores-title">
+            <div class="modal-panel">
+                <h3 id="clear-scores-title" class="font-bold text-lg mb-3">Διαγραφή σκορ;</h3>
+                <p class="text-sm text-gray-600 mb-5">Θα διαγραφούν όλες οι ψήφοι. Η εκδήλωση θα μείνει σε αναμονή μέχρι να πατήσετε «Έναρξη» στον Ζωντανό Έλεγχο.</p>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button type="button" wire:click="confirmClearScores" class="w-full btn-touch bg-red-600 text-white">Ναι, διαγραφή</button>
+                    <button type="button" wire:click="cancelClearScores" class="w-full btn-touch border border-gray-300">Όχι</button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

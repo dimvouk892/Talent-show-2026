@@ -58,6 +58,10 @@ class TalentShowControlService
 
     public function openScoring(TalentShow $talentShow): TalentShow
     {
+        if (! in_array($talentShow->status, [TalentShowStatus::Draft, TalentShowStatus::Ready], true)) {
+            throw new InvalidArgumentException('Η εκδήλωση πρέπει να είναι σε αναμονή. Διαγράψτε τα σκορ από τις Ρυθμίσεις και μετά πατήστε Έναρξη.');
+        }
+
         $this->validateReadyToStart($talentShow);
 
         return DB::transaction(function () use ($talentShow) {
@@ -679,26 +683,6 @@ class TalentShowControlService
 
         try {
             $this->validateReadyToStart($talentShow);
-        } catch (InvalidArgumentException) {
-            return false;
-        }
-
-        return true;
-    }
-
-    public function canRestartScoring(TalentShow $talentShow): bool
-    {
-        if ($talentShow->status === TalentShowStatus::Archived) {
-            return false;
-        }
-
-        if (in_array($talentShow->status, [TalentShowStatus::Draft, TalentShowStatus::Ready], true)
-            && ! $talentShow->votes()->exists()) {
-            return false;
-        }
-
-        try {
-            $this->validateReadyToStart($talentShow->fresh());
         } catch (InvalidArgumentException) {
             return false;
         }

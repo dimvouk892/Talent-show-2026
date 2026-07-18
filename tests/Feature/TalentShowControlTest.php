@@ -11,6 +11,7 @@ use App\Services\ScoreCalculationService;
 use App\Services\TalentShowControlService;
 use App\Services\VoteService;
 use App\Livewire\Admin\LiveControl;
+use App\Livewire\Admin\TalentShows\Edit;
 use InvalidArgumentException;
 use Livewire\Livewire;
 use Tests\TalentShowTestCase;
@@ -250,15 +251,31 @@ class TalentShowControlTest extends TalentShowTestCase
         );
     }
 
-    public function test_clear_scores_via_service(): void
+    public function test_clear_scores_via_settings_leaves_show_waiting(): void
     {
         $this->openScoring();
         app(VoteService::class)->submit($this->show->judges()->first(), $this->show->currentTeam, 10);
 
-        app(TalentShowControlService::class)->clearScores($this->show->fresh());
+        Livewire::actingAs($this->admin)
+            ->test(Edit::class, ['talentShow' => $this->show])
+            ->call('askClearScores')
+            ->assertSet('showClearScoresConfirm', true)
+            ->call('confirmClearScores')
+            ->assertSet('showClearScoresConfirm', false)
+            ->assertSet(
+                'flashSuccess',
+                'Οι βαθμολογίες διαγράφηκαν. Η εκδήλωση είναι σε αναμονή — πατήστε «Έναρξη» στον Ζωντανό Έλεγχο.'
+            );
 
         $this->assertEquals(0, Vote::where('talent_show_id', $this->show->id)->count());
         $this->assertEquals(TalentShowStatus::Ready, $this->show->fresh()->status);
+
+        Livewire::actingAs($this->admin)
+            ->test(LiveControl::class, ['talentShow' => $this->show->fresh()])
+            ->call('openScoring')
+            ->assertSet('flashSuccess', 'Η ψηφοφορία ξεκίνησε.');
+
+        $this->assertEquals(TalentShowStatus::ScoringOpen, $this->show->fresh()->status);
     }
 
     public function test_restart_show_allows_judges_to_vote_again(): void
@@ -308,22 +325,20 @@ class TalentShowControlTest extends TalentShowTestCase
             ->assertSee('Απαιτείται τουλάχιστον 1 ενεργός κριτής.');
     }
 
-    public function test_restart_via_live_control_open_scoring(): void
+    public function test_open_scoring_requires_waiting_state(): void
     {
         $this->openScoring();
         $this->voteForCurrentTeam();
 
         Livewire::actingAs($this->admin)
             ->test(LiveControl::class, ['talentShow' => $this->show->fresh()])
-            ->call('askRestartScoring')
-            ->assertSet('showRestartConfirm', true)
-            ->call('confirmRestartScoring')
-            ->assertSet('flashSuccess', 'Η ψηφοφορία ξεκίνησε από την αρχή.')
-            ->assertSet('showRestartConfirm', false);
+            ->call('openScoring')
+            ->assertSet(
+                'flashError',
+                'Η εκδήλωση πρέπει να είναι σε αναμονή. Διαγράψτε τα σκορ από τις Ρυθμίσεις και μετά πατήστε Έναρξη.'
+            );
 
-        $this->show->refresh();
-        $this->assertEquals(0, Vote::where('talent_show_id', $this->show->id)->count());
-        $this->assertEquals(TalentShowStatus::ScoringOpen, $this->show->status);
+        $this->assertGreaterThan(0, Vote::where('talent_show_id', $this->show->id)->count());
     }
 
     public function test_restart_works_with_any_number_of_active_judges(): void

@@ -46,8 +46,6 @@ class LiveControl extends Component
 
     public bool $showWinnerSelect = false;
 
-    public bool $showRestartConfirm = false;
-
     public ?string $flashSuccess = null;
 
     public ?string $flashError = null;
@@ -93,40 +91,10 @@ class LiveControl extends Component
     public function openScoring(TalentShowControlService $control): void
     {
         try {
-            $talentShow = $this->getTalentShow();
-
-            // Αν η εκδήλωση δεν είναι σε draft/ready, καθαρίζουμε και ξεκινάμε από την αρχή.
-            if (! in_array($talentShow->status->value, ['draft', 'ready'], true) || $talentShow->votes()->exists()) {
-                $talentShow = $control->clearScores($talentShow);
-            }
-
-            $control->openScoring($talentShow);
-            $this->showRestartConfirm = false;
+            $control->openScoring($this->getTalentShow());
             $this->notifySuccess('Η ψηφοφορία ξεκίνησε.');
         } catch (InvalidArgumentException $e) {
             $this->notifyError($e->getMessage());
-        }
-    }
-
-    public function askRestartScoring(): void
-    {
-        $this->showRestartConfirm = true;
-    }
-
-    public function cancelRestartScoring(): void
-    {
-        $this->showRestartConfirm = false;
-    }
-
-    public function confirmRestartScoring(TalentShowControlService $control): void
-    {
-        try {
-            $control->restartShow($this->getTalentShow());
-            $this->showRestartConfirm = false;
-            $this->notifySuccess('Η ψηφοφορία ξεκίνησε από την αρχή.');
-        } catch (InvalidArgumentException $e) {
-            $this->notifyError($e->getMessage());
-            $this->showRestartConfirm = false;
         }
     }
 
@@ -468,7 +436,6 @@ class LiveControl extends Component
             'flowHint' => $control->flowHint($talentShow),
             'canStartShow' => $control->canStartShow($talentShow),
             'canOpenScoring' => $control->canOpenScoring($talentShow),
-            'canRestartScoring' => $control->canRestartScoring($talentShow),
             'canRevealScores' => $control->canRevealScores($talentShow),
             'canHideScores' => $control->canHideScores($talentShow),
             'canCloseScoring' => $control->canCloseScoring($talentShow),
