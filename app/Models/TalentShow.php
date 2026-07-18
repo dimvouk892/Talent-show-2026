@@ -25,6 +25,7 @@ class TalentShow extends Model
         'winner_revealed',
         'podium_reveal_step',
         'show_final_overview',
+        'show_final_chart',
         'presentation_bg_path',
         'presentation_bg_type',
         'created_by',
@@ -42,6 +43,7 @@ class TalentShow extends Model
             'winner_revealed' => 'boolean',
             'podium_reveal_step' => 'integer',
             'show_final_overview' => 'boolean',
+            'show_final_chart' => 'boolean',
         ];
     }
 

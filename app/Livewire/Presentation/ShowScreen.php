@@ -30,7 +30,9 @@ class ShowScreen extends Component
         $judgeStatus = $currentTeam && $this->talentShow->show_live_scores && $scores && $scores['votes_count'] > 0
             ? $scoreCalculationService->judgeVoteStatus($this->talentShow, $currentTeam)
             : [];
-        $ranking = $this->talentShow->show_ranking || $this->talentShow->show_final_overview
+        $ranking = $this->talentShow->show_ranking
+            || $this->talentShow->show_final_overview
+            || $this->talentShow->show_final_chart
             ? array_values(array_filter(
                 $resultsService->getRanking($this->talentShow),
                 fn ($item) => $item['is_complete']
@@ -55,8 +57,8 @@ class ShowScreen extends Component
     {
         $show = $this->talentShow;
 
-        if ($show->show_final_overview) {
-            return 'final-overview';
+        if ($show->show_final_overview || $show->show_final_chart) {
+            return 'final-'.($show->show_final_overview ? 'rank' : '').($show->show_final_chart ? 'chart' : '');
         }
 
         if (($podium['step'] ?? 0) > 0) {

@@ -464,7 +464,10 @@ class TalentShowControlService
             throw new InvalidArgumentException('Η πλήρης κατάταξη εμφανίζεται μετά την ολοκλήρωση της τελετής top 5.');
         }
 
-        $talentShow->update(['show_final_overview' => true]);
+        $talentShow->update([
+            'show_final_overview' => true,
+            'show_final_chart' => false,
+        ]);
 
         $this->auditLogService->log(
             action: 'final_overview_shown',
@@ -481,6 +484,39 @@ class TalentShowControlService
 
         $this->auditLogService->log(
             action: 'final_overview_hidden',
+            entityType: 'talent_show',
+            entityId: $talentShow->id,
+        );
+
+        return $talentShow->fresh();
+    }
+
+    public function showFinalChart(TalentShow $talentShow): TalentShow
+    {
+        if (! $this->canShowFinalChart($talentShow)) {
+            throw new InvalidArgumentException('Το γράφημα εμφανίζεται μετά την ολοκλήρωση της τελετής top 5.');
+        }
+
+        $talentShow->update([
+            'show_final_chart' => true,
+            'show_final_overview' => false,
+        ]);
+
+        $this->auditLogService->log(
+            action: 'final_chart_shown',
+            entityType: 'talent_show',
+            entityId: $talentShow->id,
+        );
+
+        return $talentShow->fresh();
+    }
+
+    public function hideFinalChart(TalentShow $talentShow): TalentShow
+    {
+        $talentShow->update(['show_final_chart' => false]);
+
+        $this->auditLogService->log(
+            action: 'final_chart_hidden',
             entityType: 'talent_show',
             entityId: $talentShow->id,
         );
@@ -635,6 +671,7 @@ class TalentShowControlService
                 'winner_revealed' => false,
                 'podium_reveal_step' => 0,
                 'show_final_overview' => false,
+                'show_final_chart' => false,
             ]);
 
             $this->auditLogService->log(
@@ -764,6 +801,35 @@ class TalentShowControlService
         return (bool) $talentShow->show_final_overview;
     }
 
+    public function canShowFinalChart(TalentShow $talentShow): bool
+    {
+        if ($talentShow->show_final_chart || $talentShow->hasPendingFinalVote()) {
+            return false;
+        }
+
+        $podium = $this->resultsService->getPodiumRevealState($talentShow);
+
+        return $talentShow->winner_revealed || $podium['is_complete'];
+    }
+
+    public function canHideFinalChart(TalentShow $talentShow): bool
+    {
+        return (bool) $talentShow->show_final_chart;
+    }
+
+    public function canShowScoreboardPanel(TalentShow $talentShow): bool
+    {
+        if ($talentShow->hasPendingFinalVote()) {
+            return false;
+        }
+
+        return in_array($talentShow->status, [
+            TalentShowStatus::ScoringClosed,
+            TalentShowStatus::ResultsReady,
+            TalentShowStatus::WinnerRevealed,
+        ], true) || $talentShow->show_ranking || $talentShow->winner_revealed;
+    }
+
     public function canRevealScores(TalentShow $talentShow): bool
     {
         if ($talentShow->status !== TalentShowStatus::ScoringOpen) {
@@ -850,8 +916,10 @@ class TalentShowControlService
                 ? 'Η τελετή top 5 ολοκληρώθηκε ή συνεχίστε τα βήματα.'
                 : 'Ξεκινήστε την αποκάλυψη top 5 (5η → 1η θέση).',
             TalentShowStatus::WinnerRevealed => $talentShow->show_final_overview
-                ? 'Εμφανίζεται η πλήρης κατάταξη και το γράφημα. Μπορείτε να καθαρίσετε ή να ξεκινήσετε ξανά.'
-                : 'Ο νικητής αποκαλύφθηκε. Προαιρετικά εμφανίστε όλες τις ομάδες + γράφημα.',
+                ? 'Εμφανίζεται η τελική κατάταξη στον monitor.'
+                : ($talentShow->show_final_chart
+                    ? 'Εμφανίζεται το γράφημα στον monitor.'
+                    : 'Ο νικητής αποκαλύφθηκε. Επιλέξτε κατάταξη, γράφημα ή πίνακα βαθμολογιών.'),
             TalentShowStatus::Completed => 'Η εκδήλωση ολοκληρώθηκε.',
             TalentShowStatus::Archived => 'Η εκδήλωση είναι αρχειοθετημένη.',
         };

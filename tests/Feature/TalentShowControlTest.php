@@ -475,7 +475,7 @@ class TalentShowControlTest extends TalentShowTestCase
             ->assertSee('Αναμονή αποκάλυψης top 5');
     }
 
-    public function test_final_overview_shows_all_teams_and_chart_after_podium(): void
+    public function test_final_overview_shows_ranking_without_chart(): void
     {
         $this->completeAllVotingWithDistinctScores();
         $control = app(TalentShowControlService::class);
@@ -490,15 +490,37 @@ class TalentShowControlTest extends TalentShowTestCase
         $this->show->refresh();
 
         $this->assertTrue($this->show->show_final_overview);
+        $this->assertFalse($this->show->show_final_chart);
 
         $this->get(route('presentation.show'))
             ->assertOk()
             ->assertSee('Τελική κατάταξη')
-            ->assertSee('Γράφημα αποτελεσμάτων')
-            ->assertSee('Team 1');
+            ->assertSee('Team 1')
+            ->assertDontSee('Γράφημα αποτελεσμάτων');
 
         $control->hideFinalOverview($this->show->fresh());
         $this->assertFalse($this->show->fresh()->show_final_overview);
+    }
+
+    public function test_final_chart_shows_chart_without_ranking_list(): void
+    {
+        $this->completeAllVotingWithDistinctScores();
+        $control = app(TalentShowControlService::class);
+        $control->showRanking($this->show->fresh());
+        $control->startPodiumReveal($this->show->fresh());
+        $control->nextPodiumReveal($this->show->fresh());
+        $control->nextPodiumReveal($this->show->fresh());
+
+        $control->showFinalChart($this->show->fresh());
+        $this->show->refresh();
+
+        $this->assertTrue($this->show->show_final_chart);
+        $this->assertFalse($this->show->show_final_overview);
+
+        $this->get(route('presentation.show'))
+            ->assertOk()
+            ->assertSee('Γράφημα αποτελεσμάτων')
+            ->assertDontSee('ΝΙΚΗΤΡΙΑ');
     }
 
     public function test_cannot_show_final_overview_before_podium_complete(): void
@@ -555,10 +577,13 @@ class TalentShowControlTest extends TalentShowTestCase
         $control->nextPodiumReveal($this->show->fresh());
         $control->nextPodiumReveal($this->show->fresh());
         $control->showFinalOverview($this->show->fresh());
+        $control->showFinalChart($this->show->fresh());
 
-        $this->assertTrue($this->show->fresh()->show_final_overview);
+        $this->assertTrue($this->show->fresh()->show_final_chart);
+        $this->assertFalse($this->show->fresh()->show_final_overview);
 
         $control->restartShow($this->show->fresh());
         $this->assertFalse($this->show->fresh()->show_final_overview);
+        $this->assertFalse($this->show->fresh()->show_final_chart);
     }
 }

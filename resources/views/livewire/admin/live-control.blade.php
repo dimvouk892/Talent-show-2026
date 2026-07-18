@@ -19,7 +19,9 @@
             && ! $hasPendingFinalVote;
         $ceremonyActive = $podium['step'] > 0 && ! $podium['is_complete'];
         $showPresentationControls = $canShowRanking || $canStartPodiumReveal || $canAdvancePodium || $canRewindPodium
-            || $canShowFinalOverview || $canHideFinalOverview;
+            || $canShowFinalOverview || $canHideFinalOverview
+            || $canShowFinalChart || $canHideFinalChart
+            || $canShowScoreboardPanel;
     @endphp
 
     {{-- Έναρξη ψηφοφορίας (μόνο από αναμονή / Ready) --}}
@@ -102,13 +104,8 @@
 
             @if ($canShowRanking)
                 <button type="button" wire:click="showRanking" class="w-full btn-touch bg-purple-600 text-white hover:bg-purple-500">
-                    Εμφάνιση κατάταξης
+                    Εμφάνιση κατάταξης (αναμονή top 5)
                 </button>
-                <a href="{{ route('presentation.panel') }}" target="_blank" rel="noopener"
-                   class="w-full btn-touch bg-indigo-600 text-white hover:bg-indigo-500 text-center">
-                    Εμφάνιση πίνακα βαθμολογιών ↗
-                </a>
-                <p class="text-sm text-gray-500 text-center">Ανοίγει το Panel με την πλήρη βαθμολογία (ομάδες × κριτές).</p>
             @endif
 
             @if ($canStartPodiumReveal)
@@ -145,12 +142,30 @@
 
             @if ($canShowFinalOverview)
                 <button type="button" wire:click="showFinalOverview" class="w-full btn-touch bg-indigo-600 text-white hover:bg-indigo-500">
-                    Εμφάνιση όλων + γράφημα
+                    Εμφάνιση κατάταξης νικητή
                 </button>
             @elseif ($canHideFinalOverview)
                 <button type="button" wire:click="hideFinalOverview" class="w-full btn-touch border border-indigo-300 text-indigo-800 hover:bg-indigo-50">
-                    Απόκρυψη πλήρους κατάταξης
+                    Απόκρυψη κατάταξης νικητή
                 </button>
+            @endif
+
+            @if ($canShowFinalChart)
+                <button type="button" wire:click="showFinalChart" class="w-full btn-touch bg-teal-600 text-white hover:bg-teal-500">
+                    Εμφάνιση γραφήματος
+                </button>
+            @elseif ($canHideFinalChart)
+                <button type="button" wire:click="hideFinalChart" class="w-full btn-touch border border-teal-300 text-teal-800 hover:bg-teal-50">
+                    Απόκρυψη γραφήματος
+                </button>
+            @endif
+
+            @if ($canShowScoreboardPanel)
+                <a href="{{ route('presentation.panel') }}" target="_blank" rel="noopener"
+                   class="w-full btn-touch bg-slate-800 text-white hover:bg-slate-700 text-center">
+                    Εμφάνιση πίνακα βαθμολογιών ↗
+                </a>
+                <p class="text-sm text-gray-500 text-center">Ανοίγει ξεχωριστή οθόνη με τον πίνακα ομάδες × κριτές.</p>
             @endif
         </section>
     @elseif ($votingFinished)

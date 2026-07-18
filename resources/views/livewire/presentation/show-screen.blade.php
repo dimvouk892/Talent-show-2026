@@ -15,7 +15,7 @@
              }, { once: true });
          })"
          class="relative flex flex-col items-center justify-center w-full">
-    @if ($talentShow->show_final_overview)
+    @if ($talentShow->show_final_overview || $talentShow->show_final_chart)
         @include('livewire.presentation.partials.final-overview', [
             'talentShow' => $talentShow,
             'ranking' => $ranking,

@@ -230,7 +230,7 @@ class LiveControl extends Component
     {
         try {
             $control->showFinalOverview($this->getTalentShow());
-            $this->notifySuccess('Εμφανίστηκαν όλες οι ομάδες και το γράφημα.');
+            $this->notifySuccess('Εμφανίστηκε η τελική κατάταξη.');
         } catch (InvalidArgumentException $e) {
             $this->notifyError($e->getMessage());
         }
@@ -239,7 +239,23 @@ class LiveControl extends Component
     public function hideFinalOverview(TalentShowControlService $control): void
     {
         $control->hideFinalOverview($this->getTalentShow());
-        $this->notifySuccess('Αποκρύφθηκε η πλήρης κατάταξη.');
+        $this->notifySuccess('Αποκρύφθηκε η τελική κατάταξη.');
+    }
+
+    public function showFinalChart(TalentShowControlService $control): void
+    {
+        try {
+            $control->showFinalChart($this->getTalentShow());
+            $this->notifySuccess('Εμφανίστηκε το γράφημα.');
+        } catch (InvalidArgumentException $e) {
+            $this->notifyError($e->getMessage());
+        }
+    }
+
+    public function hideFinalChart(TalentShowControlService $control): void
+    {
+        $control->hideFinalChart($this->getTalentShow());
+        $this->notifySuccess('Αποκρύφθηκε το γράφημα.');
     }
 
     public function completeShow(TalentShowControlService $control): void
@@ -451,6 +467,9 @@ class LiveControl extends Component
             'canRewindPodium' => $control->canRewindPodium($talentShow),
             'canShowFinalOverview' => $control->canShowFinalOverview($talentShow),
             'canHideFinalOverview' => $control->canHideFinalOverview($talentShow),
+            'canShowFinalChart' => $control->canShowFinalChart($talentShow),
+            'canHideFinalChart' => $control->canHideFinalChart($talentShow),
+            'canShowScoreboardPanel' => $control->canShowScoreboardPanel($talentShow),
             'canCompleteShow' => $control->canCompleteShow($talentShow),
             'panelJudges' => $panelReport['judges'],
             'panelRanking' => $panelReport['ranking'],
