@@ -22,9 +22,9 @@
             || $canShowFinalOverview || $canHideFinalOverview;
     @endphp
 
-    {{-- Κύρια κουμπιά ροής ψηφοφορίας --}}
-    @if (! $votingFinished)
-    <section class="card mb-5 space-y-3" aria-label="Κύριες ενέργειες">
+    {{-- Έναρξη / επανεκκίνηση --}}
+    @if ($canOpenScoring || $canRestartScoring)
+    <section class="card mb-5 space-y-3" aria-label="Έναρξη ψηφοφορίας">
         @if ($canOpenScoring)
             <button type="button"
                     wire:click="openScoring"
@@ -34,8 +34,22 @@
             <p class="text-sm text-gray-500 text-center">
                 Ξεκινά η βαθμολόγηση από την 1η ομάδα.
             </p>
+        @else
+            <button type="button"
+                    wire:click="askRestartScoring"
+                    class="w-full btn-touch text-lg border border-red-300 text-red-700 hover:bg-red-50">
+                Ξανά έναρξη
+            </button>
+            <p class="text-sm text-gray-500 text-center">
+                Διαγράφει όλες τις βαθμολογίες και ξεκινά από την 1η ομάδα.
+            </p>
         @endif
+    </section>
+    @endif
 
+    {{-- Κύρια κουμπιά ροής ψηφοφορίας --}}
+    @if (! $votingFinished)
+    <section class="card mb-5 space-y-3" aria-label="Κύριες ενέργειες">
         @if ($talentShow->status->value === 'scoring_open')
             @if ($canRevealScores)
                 <button type="button"
@@ -380,12 +394,9 @@
                         @error('finalVoteTeamId') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                     </div>
                     <div>
-                        <label for="final-vote-score" class="block text-sm font-medium mb-1">Βαθμός (9 / 10 / 12)</label>
-                        <select id="final-vote-score" wire:model="finalVoteScore" class="input-touch">
-                            <option value="9">9</option>
-                            <option value="10">10</option>
-                            <option value="12">12</option>
-                        </select>
+                        <p class="block text-sm font-medium mb-1">Βαθμός</p>
+                        <p class="input-touch bg-amber-50 text-amber-900 font-bold">11 (σταθερός)</p>
+                        <input type="hidden" wire:model="finalVoteScore" value="11">
                     </div>
                     <div>
                         <label for="final-vote-reason" class="block text-sm font-medium mb-1">Αιτιολογία *</label>
@@ -396,6 +407,19 @@
                         <button type="button" wire:click="saveFinalVote" class="w-full btn-touch bg-amber-600 text-white">Αποθήκευση</button>
                         <button type="button" wire:click="closeFinalVoteForm" class="w-full btn-touch border border-gray-300">Ακύρωση</button>
                     </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($showRestartConfirm)
+        <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="restart-scoring-title">
+            <div class="modal-panel">
+                <h3 id="restart-scoring-title" class="font-bold text-lg mb-3">Ξανά έναρξη;</h3>
+                <p class="text-sm text-gray-600 mb-5">Θα διαγραφούν όλες οι βαθμολογίες και θα ξεκινήσει η ψηφοφορία από την 1η ομάδα.</p>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button type="button" wire:click="confirmRestartScoring" class="w-full btn-touch bg-red-600 text-white">Ναι, ξανά έναρξη</button>
+                    <button type="button" wire:click="cancelRestartScoring" class="w-full btn-touch border border-gray-300">Όχι</button>
                 </div>
             </div>
         </div>

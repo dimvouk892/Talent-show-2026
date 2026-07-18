@@ -36,7 +36,7 @@
                 <div class="text-center mb-6">
                     <p class="text-slate-400 text-sm uppercase tracking-wide mb-2">Τελική ψήφος</p>
                     <h2 class="text-2xl sm:text-3xl font-bold leading-tight px-2">Επιλέξτε μία ομάδα</h2>
-                    <p class="text-slate-400 text-sm mt-2 px-4">Ψηφίζετε μόνο μία φορά: μία ομάδα και ένας βαθμός (9, 10 ή 12).</p>
+                    <p class="text-slate-400 text-sm mt-2 px-4">Ψηφίζετε μόνο μία φορά: μία ομάδα με σταθερό βαθμό <strong class="text-slate-300">{{ $finalScore }}</strong>.</p>
                 </div>
 
                 @if (! $showConfirm)
@@ -53,32 +53,21 @@
                         @endforeach
                     </div>
 
-                    <div class="mb-6">
-                        <p class="text-center text-slate-300 text-sm sm:text-base mb-4 font-medium">Επιλέξτε βαθμό</p>
-                        <div class="grid grid-cols-3 gap-3 sm:gap-4 max-w-sm mx-auto px-1"
-                             role="group"
-                             aria-label="Βαθμοί 9, 10 ή 12">
-                            @foreach ($allowedScores as $score)
-                                <button type="button"
-                                        wire:click="selectScore({{ $score }})"
-                                        aria-pressed="{{ $selectedScore === $score ? 'true' : 'false' }}"
-                                        aria-label="Βαθμός {{ $score }}"
-                                        class="aspect-square min-h-16 text-2xl sm:text-3xl font-bold rounded-xl transition-all duration-300 touch-manipulation
-                                               focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
-                                               {{ $selectedScore === $score ? 'bg-indigo-500 ring-2 ring-indigo-300 scale-105' : 'bg-slate-700 hover:bg-slate-600 active:bg-slate-500' }}">
-                                    {{ $score }}
-                                </button>
-                            @endforeach
-                        </div>
+                    <div class="mb-6 text-center">
+                        <p class="text-slate-300 text-sm sm:text-base mb-2 font-medium">Βαθμός τελικής ψήφου</p>
+                        <p class="inline-flex items-center justify-center min-w-20 h-20 text-4xl font-bold rounded-xl bg-amber-500/20 text-amber-300 border border-amber-400/40"
+                           aria-label="Βαθμός {{ $finalScore }}">
+                            {{ $finalScore }}
+                        </p>
                     </div>
 
                     <div class="sticky bottom-0 pt-4 pb-1 safe-bottom bg-gradient-to-t from-slate-900 via-slate-900 to-transparent">
                         <button type="button"
                                 wire:click="confirmSubmit"
-                                @disabled(! $selectedScore || ! $selectedTeamId)
+                                @disabled(! $selectedTeamId)
                                 class="w-full btn-touch text-lg font-bold transition-all duration-300
-                                       {{ ($selectedScore && $selectedTeamId) ? 'bg-indigo-600 hover:bg-indigo-500 text-white focus-visible:ring-indigo-400' : 'bg-slate-700 text-slate-500 cursor-not-allowed' }}"
-                                aria-disabled="{{ ($selectedScore && $selectedTeamId) ? 'false' : 'true' }}">
+                                       {{ $selectedTeamId ? 'bg-indigo-600 hover:bg-indigo-500 text-white focus-visible:ring-indigo-400' : 'bg-slate-700 text-slate-500 cursor-not-allowed' }}"
+                                aria-disabled="{{ $selectedTeamId ? 'false' : 'true' }}">
                             Υποβολή τελικής ψήφου
                         </button>
                     </div>
@@ -113,7 +102,7 @@
                     </svg>
                 </div>
                 <h2 class="text-xl sm:text-2xl font-bold mb-2">Αναμονή τελικής ψήφου</h2>
-                <p class="text-slate-400 text-base">Είστε ο κριτής τελικής ψήφου.<br>Στο τέλος θα επιλέξετε <strong class="text-slate-300">μία ομάδα</strong> και βαθμό <strong class="text-slate-300">9, 10 ή 12</strong>.</p>
+                <p class="text-slate-400 text-base">Είστε ο κριτής τελικής ψήφου.<br>Στο τέλος θα επιλέξετε <strong class="text-slate-300">μία ομάδα</strong> με βαθμό <strong class="text-slate-300">{{ $finalScore ?? 11 }}</strong>.</p>
                 <p class="text-slate-600 text-xs mt-4">Η σύνδεσή σας παραμένει ενεργή — δεν χρειάζεται νέο QR scan.</p>
             </section>
         @endif

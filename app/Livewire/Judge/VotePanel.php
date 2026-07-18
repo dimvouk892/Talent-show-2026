@@ -88,10 +88,11 @@ class VotePanel extends Component
         $judge = $this->getJudge();
 
         if ($judge?->is_final_voter) {
-            if (! $this->selectedTeamId || ! $this->selectedScore) {
+            if (! $this->selectedTeamId) {
                 return;
             }
 
+            $this->selectedScore = app(VoteService::class)->finalVoteScore();
             $this->showConfirm = true;
 
             return;
@@ -143,15 +144,16 @@ class VotePanel extends Component
 
     public function submitFinalVote(VoteService $voteService): void
     {
-        if (! $this->selectedTeamId || ! $this->selectedScore) {
+        if (! $this->selectedTeamId) {
             return;
         }
 
+        $this->selectedScore = $voteService->finalVoteScore();
         $judge = $this->getJudge();
         $team = Team::find($this->selectedTeamId);
 
         if (! $judge || ! $team) {
-            session()->flash('error', 'Επιλέξτε ομάδα και βαθμό.');
+            session()->flash('error', 'Επιλέξτε ομάδα.');
 
             return;
         }
@@ -169,7 +171,9 @@ class VotePanel extends Component
     {
         // Always scope auth to this component's judge — Livewire polls have no route {judge}.
         $judge = $judgeAccessService->keepAlive(request(), $this->judge);
-        $allowedScores = app(VoteService::class)->allowedScores();
+        $voteService = app(VoteService::class);
+        $allowedScores = $voteService->allowedScores();
+        $finalScore = $voteService->finalVoteScore();
 
         if (! $judge) {
             return $this->judgePanelView([
@@ -180,6 +184,7 @@ class VotePanel extends Component
                 'sessionInvalid' => true,
                 'judgeScene' => 'reconnecting',
                 'allowedScores' => $allowedScores,
+                'finalScore' => $finalScore,
                 'finalTeams' => collect(),
                 'isFinalVoter' => false,
                 'finalVoteOpen' => false,
@@ -199,6 +204,7 @@ class VotePanel extends Component
                 'sessionInvalid' => false,
                 'judgeScene' => 'completed',
                 'allowedScores' => $allowedScores,
+                'finalScore' => $finalScore,
                 'finalTeams' => collect(),
                 'isFinalVoter' => $judge->is_final_voter,
                 'finalVoteOpen' => false,
@@ -211,6 +217,10 @@ class VotePanel extends Component
         $finalTeams = $isFinalVoter && $talentShow
             ? $talentShow->activeTeams()->ordered()->get()
             : collect();
+
+        if ($isFinalVoter) {
+            $this->selectedScore = $finalScore;
+        }
 
         if ($isFinalVoter && $judge->votes()->where('talent_show_id', $talentShow->id)->exists()) {
             $this->hasFinalVoted = true;
@@ -225,6 +235,7 @@ class VotePanel extends Component
                 'sessionInvalid' => false,
                 'judgeScene' => $this->finalJudgeSceneKey($finalVoteOpen),
                 'allowedScores' => $allowedScores,
+                'finalScore' => $finalScore,
                 'finalTeams' => $finalTeams,
                 'isFinalVoter' => true,
                 'finalVoteOpen' => $finalVoteOpen,
@@ -268,6 +279,7 @@ class VotePanel extends Component
             'sessionInvalid' => false,
             'judgeScene' => $this->judgeSceneKey($currentTeam),
             'allowedScores' => $allowedScores,
+            'finalScore' => $finalScore,
             'finalTeams' => collect(),
             'isFinalVoter' => false,
             'finalVoteOpen' => false,

@@ -686,6 +686,26 @@ class TalentShowControlService
         return true;
     }
 
+    public function canRestartScoring(TalentShow $talentShow): bool
+    {
+        if ($talentShow->status === TalentShowStatus::Archived) {
+            return false;
+        }
+
+        if (in_array($talentShow->status, [TalentShowStatus::Draft, TalentShowStatus::Ready], true)
+            && ! $talentShow->votes()->exists()) {
+            return false;
+        }
+
+        try {
+            $this->validateReadyToStart($talentShow->fresh());
+        } catch (InvalidArgumentException) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function canRevealWinner(TalentShow $talentShow): bool
     {
         if ($talentShow->winner_revealed || $talentShow->hasPendingFinalVote()) {

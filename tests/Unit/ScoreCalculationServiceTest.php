@@ -91,15 +91,15 @@ class ScoreCalculationServiceTest extends TestCase
         $team->votes()->create([
             'talent_show_id' => $show->id,
             'judge_id' => $finalJudge->id,
-            'score' => 12,
+            'score' => 11,
             'submitted_at' => now(),
         ]);
 
         $result = app(ScoreCalculationService::class)->forTeam($team->fresh(), $show->fresh());
 
-        $this->assertEquals(62, $result['total_score']);
-        $this->assertEquals(72, $result['maximum_score']);
+        $this->assertEquals(61, $result['total_score']);
+        $this->assertEquals(71, $result['maximum_score']);
         $this->assertTrue($result['has_final_vote']);
-        $this->assertEquals(12, $result['final_vote_score']);
+        $this->assertEquals(11, $result['final_vote_score']);
     }
 }

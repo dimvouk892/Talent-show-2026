@@ -296,7 +296,7 @@ class ResultsAndCorrectionTest extends TalentShowTestCase
         }
 
         $chosen = $teams->first();
-        app(VoteService::class)->submitFinalVote($finalJudge->fresh(), $chosen, 12);
+        app(VoteService::class)->submitFinalVote($finalJudge->fresh(), $chosen, 11);
 
         $this->show->refresh();
         $this->assertFalse($this->show->hasPendingFinalVote());
@@ -304,7 +304,7 @@ class ResultsAndCorrectionTest extends TalentShowTestCase
 
         $ranking = app(ResultsService::class)->getRanking($this->show);
         $top = collect($ranking)->firstWhere('team.id', $chosen->id);
-        $this->assertEquals(40 + 12, $top['total_score']); // 4 scoring judges * 10 + final 12
+        $this->assertEquals(40 + 11, $top['total_score']); // 4 scoring judges * 10 + final 11
     }
 
     public function test_admin_can_correct_final_vote_team_and_score(): void
@@ -325,25 +325,49 @@ class ResultsAndCorrectionTest extends TalentShowTestCase
             $control->nextTeam($this->show->fresh());
         }
 
-        $vote = app(VoteService::class)->submitFinalVote($finalJudge->fresh(), $teams[0], 9);
+        $vote = app(VoteService::class)->submitFinalVote($finalJudge->fresh(), $teams[0], 11);
 
         app(VoteService::class)->correctFinalVote(
             $vote,
             $teams[1],
-            12,
+            11,
             'Διόρθωση τελικής ψήφου από admin',
             $this->admin,
         );
 
         $vote->refresh();
         $this->assertEquals($teams[1]->id, $vote->team_id);
-        $this->assertEquals(12, $vote->score);
+        $this->assertEquals(11, $vote->score);
         $this->assertTrue($vote->is_admin_edited);
 
         $this->assertDatabaseHas('audit_logs', [
             'action' => 'final_vote_corrected',
             'entity_type' => 'vote',
         ]);
+    }
+
+    public function test_final_vote_rejects_scores_other_than_eleven(): void
+    {
+        $finalJudge = $this->show->judges()->skip(4)->first();
+        $finalJudge->update(['is_final_voter' => true]);
+
+        $control = app(TalentShowControlService::class);
+        $control->openScoring($this->show);
+        $teams = $this->show->activeTeams()->ordered()->get();
+        $scoringJudges = $this->show->scoringJudges()->get();
+
+        foreach ($teams as $team) {
+            $this->show->refresh();
+            foreach ($scoringJudges as $judge) {
+                app(VoteService::class)->submit($judge, $this->show->currentTeam, 10);
+            }
+            $control->nextTeam($this->show->fresh());
+        }
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Η τελική ψήφος μπορεί να είναι μόνο 11.');
+
+        app(VoteService::class)->submitFinalVote($finalJudge->fresh(), $teams[0], 12);
     }
 
     public function test_admin_can_edit_score_from_results_table(): void

@@ -32,10 +32,6 @@ class Edit extends Component
 
     public ?string $flashError = null;
 
-    public bool $showClearScoresConfirm = false;
-
-    public bool $showRestartConfirm = false;
-
     public function mount(TalentShow $talentShow): void
     {
         $this->authorize('update', $talentShow);
@@ -103,54 +99,6 @@ class Edit extends Component
         $this->presentationBackground = null;
         $this->flashSuccess = 'Αφαιρέθηκε το φόντο παρουσίασης.';
         $this->flashError = null;
-    }
-
-    public function askClearScores(): void
-    {
-        $this->showRestartConfirm = false;
-        $this->showClearScoresConfirm = true;
-    }
-
-    public function confirmClearScores(TalentShowControlService $control): void
-    {
-        try {
-            $this->authorize('control', $this->talentShow);
-            $this->talentShow = $control->clearScores($this->talentShow->fresh());
-            $this->showClearScoresConfirm = false;
-            $this->flashSuccess = 'Οι βαθμολογίες διαγράφηκαν. Η εκδήλωση επανήλθε σε κατάσταση «Έτοιμο».';
-            $this->flashError = null;
-        } catch (InvalidArgumentException $e) {
-            $this->flashError = $e->getMessage();
-            $this->flashSuccess = null;
-            $this->showClearScoresConfirm = false;
-        }
-    }
-
-    public function confirmRestart(): void
-    {
-        $this->showClearScoresConfirm = false;
-        $this->showRestartConfirm = true;
-    }
-
-    public function cancelDangerConfirm(): void
-    {
-        $this->showClearScoresConfirm = false;
-        $this->showRestartConfirm = false;
-    }
-
-    public function restartShow(TalentShowControlService $control): void
-    {
-        try {
-            $this->authorize('control', $this->talentShow);
-            $this->talentShow = $control->restartShow($this->talentShow->fresh());
-            $this->showRestartConfirm = false;
-            $this->flashSuccess = 'Η εκδήλωση επανεκκινήθηκε και άνοιξε η βαθμολόγηση από την 1η ομάδα.';
-            $this->flashError = null;
-        } catch (InvalidArgumentException $e) {
-            $this->flashError = $e->getMessage();
-            $this->flashSuccess = null;
-            $this->showRestartConfirm = false;
-        }
     }
 
     public function render()

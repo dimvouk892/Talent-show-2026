@@ -30,7 +30,7 @@ class Results extends Component
 
     public ?int $finalVoteTeamId = null;
 
-    public int $finalVoteScore = 12;
+    public int $finalVoteScore = 11;
 
     public string $finalVoteReason = '';
 
@@ -95,7 +95,7 @@ class Results extends Component
         $this->cellTeamName = $team->name;
         $this->cellJudgeName = $judge->name.($judge->is_final_voter ? ' (τελική)' : '');
         $this->cellHadVote = $existing !== null;
-        $this->cellScore = $existing?->score ?? 9;
+        $this->cellScore = $existing?->score ?? ($judge->is_final_voter ? app(VoteService::class)->finalVoteScore() : 9);
         $this->cellReason = $existing
             ? 'Διόρθωση βαθμού από διαχειριστή'
             : 'Καταχώρηση βαθμού από διαχειριστή';
@@ -119,17 +119,25 @@ class Results extends Component
     {
         $this->authorize('update', $this->getTalentShow());
 
+        $talentShow = $this->getTalentShow();
+        $judge = Judge::where('talent_show_id', $talentShow->id)->findOrFail($this->cellJudgeId);
+        $allowed = $judge->is_final_voter
+            ? implode(',', $voteService->allowedFinalScores())
+            : implode(',', $voteService->allowedScores());
+
+        if ($judge->is_final_voter) {
+            $this->cellScore = $voteService->finalVoteScore();
+        }
+
         $this->validate([
             'cellTeamId' => ['required', 'integer'],
             'cellJudgeId' => ['required', 'integer'],
-            'cellScore' => ['required', 'integer', 'in:9,10,12'],
+            'cellScore' => ['required', 'integer', 'in:'.$allowed],
             'cellReason' => ['required', 'string', 'min:5'],
         ]);
 
         try {
-            $talentShow = $this->getTalentShow();
             $team = Team::where('talent_show_id', $talentShow->id)->findOrFail($this->cellTeamId);
-            $judge = Judge::where('talent_show_id', $talentShow->id)->findOrFail($this->cellJudgeId);
 
             $voteService->adminUpsertScore(
                 $judge,
@@ -168,7 +176,7 @@ class Results extends Component
 
         $this->finalVoteId = $existing?->id;
         $this->finalVoteTeamId = $existing?->team_id;
-        $this->finalVoteScore = $existing?->score ?? 12;
+        $this->finalVoteScore = $existing?->score ?? app(VoteService::class)->finalVoteScore();
         $this->finalVoteReason = $existing
             ? 'Διόρθωση τελικής ψήφου από διαχειριστή'
             : 'Καταχώρηση τελικής ψήφου από διαχειριστή';
@@ -182,16 +190,19 @@ class Results extends Component
         $this->finalVoteId = null;
         $this->finalVoteTeamId = null;
         $this->finalVoteReason = '';
-        $this->finalVoteScore = 12;
+        $this->finalVoteScore = app(VoteService::class)->finalVoteScore();
     }
 
     public function saveFinalVote(VoteService $voteService): void
     {
         $this->authorize('update', $this->getTalentShow());
 
+        $finalScore = $voteService->finalVoteScore();
+        $this->finalVoteScore = $finalScore;
+
         $this->validate([
             'finalVoteTeamId' => ['required', 'integer'],
-            'finalVoteScore' => ['required', 'integer', 'in:9,10,12'],
+            'finalVoteScore' => ['required', 'integer', 'in:'.$finalScore],
             'finalVoteReason' => ['required', 'string', 'min:5'],
         ]);
 

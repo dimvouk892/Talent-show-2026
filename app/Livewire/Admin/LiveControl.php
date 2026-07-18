@@ -34,7 +34,7 @@ class LiveControl extends Component
 
     public ?int $finalVoteTeamId = null;
 
-    public int $finalVoteScore = 12;
+    public int $finalVoteScore = 11;
 
     public string $finalVoteReason = '';
 
@@ -45,6 +45,8 @@ class LiveControl extends Component
     public ?int $selectedWinnerId = null;
 
     public bool $showWinnerSelect = false;
+
+    public bool $showRestartConfirm = false;
 
     public ?string $flashSuccess = null;
 
@@ -99,9 +101,32 @@ class LiveControl extends Component
             }
 
             $control->openScoring($talentShow);
+            $this->showRestartConfirm = false;
             $this->notifySuccess('Η ψηφοφορία ξεκίνησε.');
         } catch (InvalidArgumentException $e) {
             $this->notifyError($e->getMessage());
+        }
+    }
+
+    public function askRestartScoring(): void
+    {
+        $this->showRestartConfirm = true;
+    }
+
+    public function cancelRestartScoring(): void
+    {
+        $this->showRestartConfirm = false;
+    }
+
+    public function confirmRestartScoring(TalentShowControlService $control): void
+    {
+        try {
+            $control->restartShow($this->getTalentShow());
+            $this->showRestartConfirm = false;
+            $this->notifySuccess('Η ψηφοφορία ξεκίνησε από την αρχή.');
+        } catch (InvalidArgumentException $e) {
+            $this->notifyError($e->getMessage());
+            $this->showRestartConfirm = false;
         }
     }
 
@@ -311,7 +336,7 @@ class LiveControl extends Component
 
         $this->finalVoteId = $existing?->id;
         $this->finalVoteTeamId = $existing?->team_id;
-        $this->finalVoteScore = $existing?->score ?? 12;
+        $this->finalVoteScore = $existing?->score ?? app(VoteService::class)->finalVoteScore();
         $this->finalVoteReason = $existing
             ? 'Διόρθωση τελικής ψήφου από διαχειριστή'
             : 'Καταχώρηση τελικής ψήφου από διαχειριστή';
@@ -324,14 +349,17 @@ class LiveControl extends Component
         $this->finalVoteId = null;
         $this->finalVoteTeamId = null;
         $this->finalVoteReason = '';
-        $this->finalVoteScore = 12;
+        $this->finalVoteScore = app(VoteService::class)->finalVoteScore();
     }
 
     public function saveFinalVote(VoteService $voteService): void
     {
+        $finalScore = $voteService->finalVoteScore();
+        $this->finalVoteScore = $finalScore;
+
         $this->validate([
             'finalVoteTeamId' => ['required', 'integer'],
-            'finalVoteScore' => ['required', 'integer', 'in:9,10,12'],
+            'finalVoteScore' => ['required', 'integer', 'in:'.$finalScore],
             'finalVoteReason' => ['required', 'string', 'min:5'],
         ]);
 
@@ -440,6 +468,7 @@ class LiveControl extends Component
             'flowHint' => $control->flowHint($talentShow),
             'canStartShow' => $control->canStartShow($talentShow),
             'canOpenScoring' => $control->canOpenScoring($talentShow),
+            'canRestartScoring' => $control->canRestartScoring($talentShow),
             'canRevealScores' => $control->canRevealScores($talentShow),
             'canHideScores' => $control->canHideScores($talentShow),
             'canCloseScoring' => $control->canCloseScoring($talentShow),

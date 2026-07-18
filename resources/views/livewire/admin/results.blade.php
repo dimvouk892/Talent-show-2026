@@ -231,12 +231,9 @@
                         @error('finalVoteTeamId') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                     </div>
                     <div>
-                        <label for="final-vote-score" class="block text-sm font-medium mb-1">Βαθμός (9 / 10 / 12)</label>
-                        <select id="final-vote-score" wire:model="finalVoteScore" class="input-touch">
-                            <option value="9">9</option>
-                            <option value="10">10</option>
-                            <option value="12">12</option>
-                        </select>
+                        <p class="block text-sm font-medium mb-1">Βαθμός</p>
+                        <p class="input-touch bg-amber-50 text-amber-900 font-bold">11 (σταθερός)</p>
+                        <input type="hidden" wire:model="finalVoteScore" value="11">
                     </div>
                     <div>
                         <label for="final-vote-reason" class="block text-sm font-medium mb-1">Αιτιολογία *</label>

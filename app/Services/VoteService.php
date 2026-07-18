@@ -53,8 +53,8 @@ class VoteService
 
     public function submitFinalVote(Judge $judge, Team $team, ?int $score = null): Vote
     {
-        $score ??= (int) config('talent-show.max_score', 12);
-        $this->validateScore($score);
+        $score ??= $this->finalVoteScore();
+        $this->validateFinalScore($score);
         $talentShow = $team->talentShow;
 
         $this->assertCanCastFinalVote($judge, $team, $talentShow);
@@ -150,7 +150,7 @@ class VoteService
 
     public function submitFinalVoteOnBehalf(Judge $judge, Team $team, int $score, string $reason, User $admin): Vote
     {
-        $this->validateScore($score);
+        $this->validateFinalScore($score);
 
         if (strlen(trim($reason)) < 5) {
             throw new InvalidArgumentException('Η αιτιολογία είναι υποχρεωτική (τουλάχιστον 5 χαρακτήρες).');
@@ -213,7 +213,7 @@ class VoteService
 
     public function correctFinalVote(Vote $vote, Team $newTeam, int $newScore, string $reason, User $admin): Vote
     {
-        $this->validateScore($newScore);
+        $this->validateFinalScore($newScore);
 
         if (strlen(trim($reason)) < 5) {
             throw new InvalidArgumentException('Η αιτιολογία είναι υποχρεωτική (τουλάχιστον 5 χαρακτήρες).');
@@ -319,7 +319,11 @@ class VoteService
      */
     public function adminUpsertScore(Judge $judge, Team $team, int $score, string $reason, User $admin): Vote
     {
-        $this->validateScore($score);
+        if ($judge->is_final_voter) {
+            $this->validateFinalScore($score);
+        } else {
+            $this->validateScore($score);
+        }
 
         if (strlen(trim($reason)) < 5) {
             throw new InvalidArgumentException('Η αιτιολογία είναι υποχρεωτική (τουλάχιστον 5 χαρακτήρες).');
@@ -398,10 +402,27 @@ class VoteService
         return array_map('intval', config('talent-show.allowed_scores', [9, 10, 12]));
     }
 
+    public function finalVoteScore(): int
+    {
+        return (int) config('talent-show.final_vote_score', 11);
+    }
+
+    public function allowedFinalScores(): array
+    {
+        return [$this->finalVoteScore()];
+    }
+
     protected function validateScore(int $score): void
     {
         if (! in_array($score, $this->allowedScores(), true)) {
             throw new InvalidArgumentException('Ο βαθμός πρέπει να είναι 9, 10 ή 12.');
+        }
+    }
+
+    protected function validateFinalScore(int $score): void
+    {
+        if (! in_array($score, $this->allowedFinalScores(), true)) {
+            throw new InvalidArgumentException('Η τελική ψήφος μπορεί να είναι μόνο '.$this->finalVoteScore().'.');
         }
     }
 

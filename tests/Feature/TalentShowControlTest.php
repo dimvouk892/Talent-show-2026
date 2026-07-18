@@ -11,7 +11,6 @@ use App\Services\ScoreCalculationService;
 use App\Services\TalentShowControlService;
 use App\Services\VoteService;
 use App\Livewire\Admin\LiveControl;
-use App\Livewire\Admin\TalentShows\Edit;
 use InvalidArgumentException;
 use Livewire\Livewire;
 use Tests\TalentShowTestCase;
@@ -251,18 +250,12 @@ class TalentShowControlTest extends TalentShowTestCase
         );
     }
 
-    public function test_clear_scores_via_settings_modal(): void
+    public function test_clear_scores_via_service(): void
     {
         $this->openScoring();
         app(VoteService::class)->submit($this->show->judges()->first(), $this->show->currentTeam, 10);
 
-        Livewire::actingAs($this->admin)
-            ->test(Edit::class, ['talentShow' => $this->show])
-            ->call('askClearScores')
-            ->assertSet('showClearScoresConfirm', true)
-            ->call('confirmClearScores')
-            ->assertSet('flashSuccess', 'Οι βαθμολογίες διαγράφηκαν. Η εκδήλωση επανήλθε σε κατάσταση «Έτοιμο».')
-            ->assertSet('showClearScoresConfirm', false);
+        app(TalentShowControlService::class)->clearScores($this->show->fresh());
 
         $this->assertEquals(0, Vote::where('talent_show_id', $this->show->id)->count());
         $this->assertEquals(TalentShowStatus::Ready, $this->show->fresh()->status);
@@ -315,17 +308,17 @@ class TalentShowControlTest extends TalentShowTestCase
             ->assertSee('Απαιτείται τουλάχιστον 1 ενεργός κριτής.');
     }
 
-    public function test_restart_via_settings_modal(): void
+    public function test_restart_via_live_control_open_scoring(): void
     {
         $this->openScoring();
         $this->voteForCurrentTeam();
 
         Livewire::actingAs($this->admin)
-            ->test(Edit::class, ['talentShow' => $this->show])
-            ->call('confirmRestart')
+            ->test(LiveControl::class, ['talentShow' => $this->show->fresh()])
+            ->call('askRestartScoring')
             ->assertSet('showRestartConfirm', true)
-            ->call('restartShow')
-            ->assertSet('flashSuccess', 'Η εκδήλωση επανεκκινήθηκε και άνοιξε η βαθμολόγηση από την 1η ομάδα.')
+            ->call('confirmRestartScoring')
+            ->assertSet('flashSuccess', 'Η ψηφοφορία ξεκίνησε από την αρχή.')
             ->assertSet('showRestartConfirm', false);
 
         $this->show->refresh();
