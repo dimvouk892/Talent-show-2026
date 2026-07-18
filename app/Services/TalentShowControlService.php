@@ -352,6 +352,7 @@ class TalentShowControlService
             'status' => TalentShowStatus::ResultsReady,
             'show_final_overview' => false,
             'show_final_chart' => false,
+            'show_scoreboard' => false,
         ]);
 
         $this->auditLogService->log(
@@ -470,6 +471,7 @@ class TalentShowControlService
         $talentShow->update([
             'show_final_overview' => true,
             'show_final_chart' => false,
+            'show_scoreboard' => false,
         ]);
 
         $this->auditLogService->log(
@@ -503,6 +505,7 @@ class TalentShowControlService
         $talentShow->update([
             'show_final_chart' => true,
             'show_final_overview' => false,
+            'show_scoreboard' => false,
         ]);
 
         $this->auditLogService->log(
@@ -520,6 +523,40 @@ class TalentShowControlService
 
         $this->auditLogService->log(
             action: 'final_chart_hidden',
+            entityType: 'talent_show',
+            entityId: $talentShow->id,
+        );
+
+        return $talentShow->fresh();
+    }
+
+    public function showScoreboard(TalentShow $talentShow): TalentShow
+    {
+        if (! $this->canShowScoreboardPanel($talentShow)) {
+            throw new InvalidArgumentException('Ο πίνακας βαθμολογιών εμφανίζεται μετά την ολοκλήρωση της τελετής top 5.');
+        }
+
+        $talentShow->update([
+            'show_scoreboard' => true,
+            'show_final_overview' => false,
+            'show_final_chart' => false,
+        ]);
+
+        $this->auditLogService->log(
+            action: 'scoreboard_shown',
+            entityType: 'talent_show',
+            entityId: $talentShow->id,
+        );
+
+        return $talentShow->fresh();
+    }
+
+    public function hideScoreboard(TalentShow $talentShow): TalentShow
+    {
+        $talentShow->update(['show_scoreboard' => false]);
+
+        $this->auditLogService->log(
+            action: 'scoreboard_hidden',
             entityType: 'talent_show',
             entityId: $talentShow->id,
         );
@@ -675,6 +712,7 @@ class TalentShowControlService
                 'podium_reveal_step' => 0,
                 'show_final_overview' => false,
                 'show_final_chart' => false,
+                'show_scoreboard' => false,
             ]);
 
             $this->auditLogService->log(
@@ -818,7 +856,7 @@ class TalentShowControlService
 
     public function canShowScoreboardPanel(TalentShow $talentShow): bool
     {
-        if ($talentShow->hasPendingFinalVote()) {
+        if ($talentShow->show_scoreboard || $talentShow->hasPendingFinalVote()) {
             return false;
         }
 
@@ -827,13 +865,19 @@ class TalentShowControlService
         return $talentShow->winner_revealed || $podium['is_complete'];
     }
 
+    public function canHideScoreboardPanel(TalentShow $talentShow): bool
+    {
+        return (bool) $talentShow->show_scoreboard;
+    }
+
     public function canShowEndScreenControls(TalentShow $talentShow): bool
     {
         return $this->canShowFinalOverview($talentShow)
             || $this->canHideFinalOverview($talentShow)
             || $this->canShowFinalChart($talentShow)
             || $this->canHideFinalChart($talentShow)
-            || $this->canShowScoreboardPanel($talentShow);
+            || $this->canShowScoreboardPanel($talentShow)
+            || $this->canHideScoreboardPanel($talentShow);
     }
 
     public function canRevealScores(TalentShow $talentShow): bool
@@ -925,7 +969,9 @@ class TalentShowControlService
                 ? 'Εμφανίζεται η τελική κατάταξη στον monitor.'
                 : ($talentShow->show_final_chart
                     ? 'Εμφανίζεται το γράφημα στον monitor.'
-                    : 'Επιλέξτε οθόνη: τελική κατάταξη, γράφημα ή πίνακα βαθμολογιών.'),
+                    : ($talentShow->show_scoreboard
+                        ? 'Εμφανίζεται ο πίνακας βαθμολογιών στον monitor.'
+                        : 'Επιλέξτε οθόνη: τελική κατάταξη, γράφημα ή πίνακα βαθμολογιών.')),
             TalentShowStatus::Completed => 'Η εκδήλωση ολοκληρώθηκε.',
             TalentShowStatus::Archived => 'Η εκδήλωση είναι αρχειοθετημένη.',
         };

@@ -22,7 +22,7 @@
         $showPodiumControls = $canStartPodiumReveal || $canAdvancePodium || $canRewindPodium || $ceremonyActive;
         $showEndScreenControls = $canShowFinalOverview || $canHideFinalOverview
             || $canShowFinalChart || $canHideFinalChart
-            || $canShowScoreboardPanel;
+            || $canShowScoreboardPanel || $canHideScoreboardPanel;
         $showPresentationControls = $showPodiumControls || $showEndScreenControls;
     @endphp
 
@@ -178,10 +178,13 @@
                 @endif
 
                 @if ($canShowScoreboardPanel)
-                    <a href="{{ route('presentation.panel') }}" target="_blank" rel="noopener"
-                       class="w-full btn-touch bg-slate-800 text-white hover:bg-slate-700 text-center">
-                        Πίνακας βαθμολογιών ↗
-                    </a>
+                    <button type="button" wire:click="showScoreboard" class="w-full btn-touch bg-slate-800 text-white hover:bg-slate-700">
+                        Πίνακας βαθμολογιών
+                    </button>
+                @elseif ($canHideScoreboardPanel)
+                    <button type="button" wire:click="hideScoreboard" class="w-full btn-touch border border-slate-400 text-slate-800 hover:bg-slate-50">
+                        Απόκρυψη πίνακα βαθμολογιών
+                    </button>
                 @endif
             </section>
         @endif
@@ -193,73 +196,6 @@
                class="inline-flex btn-touch-sm bg-gray-800 text-white hover:bg-gray-700">
                 Monitor ↗
             </a>
-        </section>
-    @endif
-
-    {{-- Πλήρης βαθμολογία (ίδια με Panel) — μετά την τελετή --}}
-    @if ($showEndScreenControls && $panelJudges->isNotEmpty() && count($panelRanking) > 0)
-        <section class="card mb-5 p-0 overflow-hidden" aria-label="Πίνακας βαθμολογιών">
-            <div class="px-4 py-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
-                    <h2 class="font-semibold text-gray-900">Πίνακας βαθμολογιών</h2>
-                    <p class="text-xs text-gray-500 mt-0.5">Ίδιο περιεχόμενο με το Panel · ζωντανή ενημέρωση</p>
-                </div>
-                <a href="{{ route('presentation.panel') }}" target="_blank" rel="noopener"
-                   class="btn-touch-sm text-center bg-indigo-600 text-white hover:bg-indigo-500">
-                    Άνοιγμα Panel ↗
-                </a>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm border-collapse min-w-[640px]">
-                    <thead>
-                        <tr class="bg-gray-50 text-gray-600">
-                            <th class="p-3 text-left font-semibold border-b border-gray-200">#</th>
-                            <th class="p-3 text-left font-semibold border-b border-gray-200">Ομάδα</th>
-                            @foreach ($panelJudges as $judge)
-                                <th class="p-3 text-center font-semibold border-b border-gray-200 whitespace-nowrap {{ $judge->is_final_voter ? 'bg-amber-50 text-amber-900' : '' }}"
-                                    title="{{ $judge->name }}">
-                                    <span class="block max-w-[6rem] mx-auto truncate">{{ $judge->name }}</span>
-                                    @if ($judge->is_final_voter)
-                                        <span class="block text-[10px] font-normal text-amber-700 mt-0.5">τελική</span>
-                                    @endif
-                                </th>
-                            @endforeach
-                            <th class="p-3 text-center font-semibold border-b border-gray-200 bg-indigo-50 text-indigo-900">Σύνολο</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($panelRanking as $item)
-                            @php
-                                $hasAnyVote = $item['votes_count'] > 0
-                                    || collect($item['judge_scores'])->contains('has_voted', true);
-                            @endphp
-                            <tr class="border-b border-gray-100 {{ ! $item['is_complete'] && $hasAnyVote ? 'bg-orange-50/60' : '' }}">
-                                <td class="p-3 font-bold text-indigo-600 tabular-nums">
-                                    {{ $item['ranking_position'] ?: '—' }}
-                                </td>
-                                <td class="p-3 font-medium break-words">{{ $item['team']->name }}</td>
-                                @foreach ($panelJudges as $judge)
-                                    @php
-                                        $score = collect($item['judge_scores'])->firstWhere('judge_id', $judge->id);
-                                    @endphp
-                                    <td class="p-3 text-center tabular-nums {{ $judge->is_final_voter ? 'bg-amber-50/50' : '' }}">
-                                        @if ($score && $score['has_voted'])
-                                            <span class="font-bold {{ $judge->is_final_voter ? 'text-amber-800' : 'text-indigo-700' }}">
-                                                {{ $score['score'] }}
-                                            </span>
-                                        @else
-                                            <span class="text-gray-300">—</span>
-                                        @endif
-                                    </td>
-                                @endforeach
-                                <td class="p-3 text-center font-bold bg-indigo-50/70 tabular-nums">
-                                    {{ $hasAnyVote ? $item['total_score'] : '—' }}
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
         </section>
     @endif
 

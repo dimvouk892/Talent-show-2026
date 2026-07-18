@@ -527,6 +527,33 @@ class TalentShowControlTest extends TalentShowTestCase
             ->assertDontSee('ΝΙΚΗΤΡΙΑ');
     }
 
+    public function test_scoreboard_shows_on_main_monitor(): void
+    {
+        $this->completeAllVotingWithDistinctScores();
+        $control = app(TalentShowControlService::class);
+        $control->showRanking($this->show->fresh());
+        $control->startPodiumReveal($this->show->fresh());
+        $control->nextPodiumReveal($this->show->fresh());
+        $control->nextPodiumReveal($this->show->fresh());
+
+        $this->assertTrue($control->canShowScoreboardPanel($this->show->fresh()));
+
+        $control->showScoreboard($this->show->fresh());
+        $this->show->refresh();
+
+        $this->assertTrue($this->show->show_scoreboard);
+        $this->assertFalse($this->show->show_final_overview);
+        $this->assertFalse($this->show->show_final_chart);
+
+        $this->get(route('presentation.show'))
+            ->assertOk()
+            ->assertSee('Πίνακας βαθμολογιών')
+            ->assertSee('Team 1');
+
+        $control->hideScoreboard($this->show->fresh());
+        $this->assertFalse($this->show->fresh()->show_scoreboard);
+    }
+
     public function test_cannot_show_final_overview_before_podium_complete(): void
     {
         $this->completeAllVotingWithDistinctScores();
@@ -589,5 +616,6 @@ class TalentShowControlTest extends TalentShowTestCase
         $control->restartShow($this->show->fresh());
         $this->assertFalse($this->show->fresh()->show_final_overview);
         $this->assertFalse($this->show->fresh()->show_final_chart);
+        $this->assertFalse($this->show->fresh()->show_scoreboard);
     }
 }

@@ -15,7 +15,17 @@
              }, { once: true });
          })"
          class="relative flex flex-col items-center justify-center w-full">
-    @if ($talentShow->show_final_overview || $talentShow->show_final_chart)
+    @if ($talentShow->show_scoreboard)
+        @include('livewire.presentation.partials.scoreboard', [
+            'talentShow' => $talentShow,
+            'judges' => $scoreboardJudges,
+            'ranking' => $scoreboardRanking,
+            'winner' => $winner,
+            'showEventTitle' => false,
+            'showScoreboardTitle' => true,
+            'showLiveBadge' => false,
+        ])
+    @elseif ($talentShow->show_final_overview || $talentShow->show_final_chart)
         @include('livewire.presentation.partials.final-overview', [
             'talentShow' => $talentShow,
             'ranking' => $ranking,

@@ -258,6 +258,22 @@ class LiveControl extends Component
         $this->notifySuccess('Αποκρύφθηκε το γράφημα.');
     }
 
+    public function showScoreboard(TalentShowControlService $control): void
+    {
+        try {
+            $control->showScoreboard($this->getTalentShow());
+            $this->notifySuccess('Εμφανίστηκε ο πίνακας βαθμολογιών στο monitor.');
+        } catch (InvalidArgumentException $e) {
+            $this->notifyError($e->getMessage());
+        }
+    }
+
+    public function hideScoreboard(TalentShowControlService $control): void
+    {
+        $control->hideScoreboard($this->getTalentShow());
+        $this->notifySuccess('Αποκρύφθηκε ο πίνακας βαθμολογιών.');
+    }
+
     public function completeShow(TalentShowControlService $control): void
     {
         $control->completeShow($this->getTalentShow());
@@ -439,7 +455,6 @@ class LiveControl extends Component
         $finalVote = $finalVoter
             ? $finalVoter->votes()->where('talent_show_id', $talentShow->id)->with('team')->first()
             : null;
-        $panelReport = $resultsService->getDetailedReport($talentShow);
 
         return view('livewire.admin.live-control', [
             'talentShow' => $talentShow,
@@ -470,9 +485,8 @@ class LiveControl extends Component
             'canShowFinalChart' => $control->canShowFinalChart($talentShow),
             'canHideFinalChart' => $control->canHideFinalChart($talentShow),
             'canShowScoreboardPanel' => $control->canShowScoreboardPanel($talentShow),
+            'canHideScoreboardPanel' => $control->canHideScoreboardPanel($talentShow),
             'canCompleteShow' => $control->canCompleteShow($talentShow),
-            'panelJudges' => $panelReport['judges'],
-            'panelRanking' => $panelReport['ranking'],
         ]);
     }
 }

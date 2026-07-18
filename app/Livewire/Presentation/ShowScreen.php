@@ -41,6 +41,14 @@ class ShowScreen extends Component
         $podium = $resultsService->getPodiumRevealState($this->talentShow);
         $winner = $resultsService->getWinner($this->talentShow);
 
+        $scoreboardJudges = collect();
+        $scoreboardRanking = [];
+        if ($this->talentShow->show_scoreboard) {
+            $report = $resultsService->getDetailedReport($this->talentShow);
+            $scoreboardJudges = $report['judges'];
+            $scoreboardRanking = $report['ranking'];
+        }
+
         return view('livewire.presentation.show-screen', [
             'currentTeam' => $currentTeam,
             'scores' => $scores,
@@ -49,6 +57,8 @@ class ShowScreen extends Component
             'ranking' => $ranking,
             'podium' => $podium,
             'winner' => $winner,
+            'scoreboardJudges' => $scoreboardJudges,
+            'scoreboardRanking' => $scoreboardRanking,
             'presentationScene' => $this->presentationSceneKey($currentTeam, $ranking, $podium),
         ]);
     }
@@ -56,6 +66,10 @@ class ShowScreen extends Component
     protected function presentationSceneKey($currentTeam, array $ranking, array $podium): string
     {
         $show = $this->talentShow;
+
+        if ($show->show_scoreboard) {
+            return 'scoreboard';
+        }
 
         if ($show->show_final_overview || $show->show_final_chart) {
             return 'final-'.($show->show_final_overview ? 'rank' : '').($show->show_final_chart ? 'chart' : '');
