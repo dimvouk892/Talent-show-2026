@@ -1,21 +1,27 @@
 #!/bin/bash
 # Run on Hostinger SSH from anywhere:
 #   bash ~/domains/vprint.gr/talent-show/hostinger/setup-public-html.sh
+#
+# Layout:
+#   ~/domains/vprint.gr/talent-show   Laravel app
+#   ~/domains/vprint.gr/public_html   web document root
 
 set -euo pipefail
 
-DOMAIN_ROOT="${HOME}/domains/vprint.gr"
-APP_DIR="${DOMAIN_ROOT}/talent-show"
-WEB_DIR="${DOMAIN_ROOT}/public_html"
+DOMAIN_ROOT="${DOMAIN_ROOT:-${HOME}/domains/vprint.gr}"
+APP_DIR="${APP_DIR:-${DOMAIN_ROOT}/talent-show}"
+WEB_DIR="${WEB_DIR:-${DOMAIN_ROOT}/public_html}"
 PHP_BIN="${PHP_BIN:-/opt/alt/php84/usr/bin/php}"
 
 if [ ! -d "$APP_DIR" ]; then
   echo "ERROR: App not found at $APP_DIR"
+  echo "Set APP_DIR=/path/to/talent-show and WEB_DIR=/path/to/public_html"
   exit 1
 fi
 
 if [ ! -d "$WEB_DIR" ]; then
   echo "ERROR: public_html not found at $WEB_DIR"
+  echo "Set WEB_DIR=/path/to/public_html"
   exit 1
 fi
 
@@ -76,6 +82,8 @@ else
 fi
 
 echo "OK"
+echo "App:  $APP_DIR"
+echo "Web:  $WEB_DIR"
 echo "Check: $WEB_DIR/index.php"
 echo "Check: $WEB_DIR/build/manifest.json"
 echo "Check storage symlink:"
